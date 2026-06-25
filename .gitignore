@@ -1,0 +1,6 @@
+backend/.env
+backend/shopsathi.db
+__pycache__/
+*.pyc
+.vscode/
+.env
