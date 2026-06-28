@@ -4864,6 +4864,10 @@
                         applyAIToLocalMath(result);
                         finishProcessing();
                         return;
+                    } else if (result.status === "NAVIGATE") {
+                        switchTab(result.target.toLowerCase());
+                        finishProcessing();
+                        return;
                     }
                 }
 
@@ -5597,10 +5601,17 @@
 
         function deleteStockItem(index) {
             if (confirm("Are you sure you want to delete this item?")) {
+                let item = localStock[index];
                 localStock.splice(index, 1);
                 document.getElementById('editStockOverlay').style.display = 'none';
                 renderUI();
                 showToast("Item Deleted");
+                
+                if (item && item.id && String(item.id).startsWith("item_")) {
+                    fetch(`${RENDER_API_URL}/api/inventory/item/${item.id}?merchant_id=${MERCHANT_ID}`, {
+                        method: 'DELETE'
+                    }).catch(e => console.error("Failed to delete stock remotely", e));
+                }
             }
         }
 

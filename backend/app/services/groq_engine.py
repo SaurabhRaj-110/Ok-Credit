@@ -29,8 +29,9 @@ class GroqEngine:
         3. "SUPPLIER_PAYMENT": Shopkeeper paid money to supplier/distributor. Subtracts from supplier balance.
         4. "SUPPLIER_CREDIT": Shopkeeper took maal on credit from supplier. Adds to supplier balance.
         5. "ADD_STOCK" / "REDUCE_STOCK": For inventory changes. DO NOT confuse people's names with stock items.
-        6. For names of items or people, ALWAYS transliterate Hindi/regional words into English script (e.g., "सौरभ राज" -> "Saurabh Raj", "सलोनी" -> "Saloni"). Do NOT return text in Devanagari.
-        7. Pay close attention to multiple commands for different parties in the same sentence. 
+        6. "NAVIGATE_STOCK" / "NAVIGATE_KHATA" / "NAVIGATE_SNAP": Use these if the user wants to navigate to a section (e.g., "stock dikhao", "khata section kholo", "snap scanner open karo"). Do not extract items or amounts for navigation.
+        7. For names of items or people, ALWAYS transliterate Hindi/regional words into English script (e.g., "सौरभ राज" -> "Saurabh Raj", "सलोनी" -> "Saloni"). Do NOT return text in Devanagari.
+        8. Pay close attention to multiple commands for different parties in the same sentence. 
            Example: "सलोनी के खाते में 2000 एडवांस और सौरव राज के खाते में 200 रुपए उधार लिख दो" 
            MUST return TWO actions: 
            - {{"action": "CUSTOMER_PAYMENT", "target_name": "Saloni", "amount": 2000}}
@@ -41,7 +42,7 @@ class GroqEngine:
         {{
           "actions": [
             {{
-                "action": "CUSTOMER_PAYMENT" | "CUSTOMER_CREDIT" | "SUPPLIER_PAYMENT" | "SUPPLIER_CREDIT" | "ADD_STOCK" | "REDUCE_STOCK" | "UNKNOWN",
+                "action": "CUSTOMER_PAYMENT" | "CUSTOMER_CREDIT" | "SUPPLIER_PAYMENT" | "SUPPLIER_CREDIT" | "ADD_STOCK" | "REDUCE_STOCK" | "NAVIGATE_STOCK" | "NAVIGATE_KHATA" | "NAVIGATE_SNAP" | "UNKNOWN",
                 "item_name": string or null,
                 "quantity": float or null,
                 "unit": string or null,

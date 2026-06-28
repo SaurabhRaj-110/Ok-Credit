@@ -57,6 +57,11 @@ async def process_voice_command(payload: VoiceRequest):
     cursor = conn.cursor()
     
     try:
+        # Check if the user is asking to navigate
+        if len(ai_result_array) == 1 and ai_result_array[0].get("action", "").startswith("NAVIGATE_"):
+            target_tab = ai_result_array[0].get("action").replace("NAVIGATE_", "")
+            return {"status": "NAVIGATE", "target": target_tab}
+            
         actions_processed = []
         for ai_result in ai_result_array:
             action = ai_result.get("action", "UNKNOWN")
@@ -70,25 +75,8 @@ async def process_voice_command(payload: VoiceRequest):
                     continue
                 
                 party_type = "SUPPLIER" if "SUPPLIER" in action else "CUSTOMER"
-                party_id = find_closest_party(conn, payload.merchant_id, target_name, party_type)
-                
-                is_balance_increase = action in ["CUSTOMER_CREDIT", "SUPPLIER_CREDIT"]
-                txn_type = "GIVEN" if action in ["CUSTOMER_CREDIT", "SUPPLIER_PAYMENT"] else "GOT"
-                balance_change = amount if is_balance_increase else -amount
-                
-                txn_id = f"txn_{uuid.uuid4().hex[:6]}"
-                cursor.execute(
-                    "INSERT INTO transactions (transaction_id, party_id, merchant_id, amount, txn_type, entry_source, voice_transcript) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (txn_id, party_id, payload.merchant_id, amount, txn_type, "VOICE", payload.transcript)
-                )
-                
-                cursor.execute(
-                    "UPDATE parties SET total_balance = total_balance + ? WHERE party_id = ?",
-                    (balance_change, party_id)
-                )
-                
                 role_str = "Grahak" if party_type == "CUSTOMER" else "Supplier"
-                actions_processed.append(f"{target_name} ({role_str}) ke khate mein ₹{amount} update ho gaye.")
+                actions_processed.append(f"{target_name} ({role_str}) ke khate mein ₹{amount} update honge.")
                 
             # ---- HANDLE STOCK / INVENTORY MANAGEMENT ----
             elif action in ["ADD_STOCK", "REDUCE_STOCK"]:
@@ -102,33 +90,9 @@ async def process_voice_command(payload: VoiceRequest):
                 if not item_name:
                     continue
                     
-                cursor.execute(
-                    "SELECT item_id, current_stock FROM inventory WHERE merchant_id = ? AND LOWER(item_name) = ?",
-                    (payload.merchant_id, item_name.lower().strip())
-                )
-                item_row = cursor.fetchone()
-                
-                qty_change = qty if action == "ADD_STOCK" else -qty
-                
-                if item_row:
-                    new_stock = max(0, item_row["current_stock"] + qty_change)
-                    cursor.execute(
-                        "UPDATE inventory SET current_stock = ? WHERE item_id = ?",
-                        (new_stock, item_row["item_id"])
-                    )
-                else:
-                    new_item_id = f"item_{uuid.uuid4().hex[:6]}"
-                    new_stock = qty if action == "ADD_STOCK" else 0
-                    cursor.execute(
-                        "INSERT INTO inventory (item_id, merchant_id, item_name, current_stock, reorder_level, price) VALUES (?, ?, ?, ?, 10.0, 0.0)",
-                        (new_item_id, payload.merchant_id, item_name, new_stock)
-                    )
-                    
                 change_str = f"+{qty}" if action == "ADD_STOCK" else f"-{qty}"
-                actions_processed.append(f"{item_name} ka stock updated: {change_str} units.")
+                actions_processed.append(f"{item_name} ka stock update hoga: {change_str} units.")
                 
-        conn.commit()
-        
         if not actions_processed:
              return {"status": "TRY_AGAIN", "msg": "Saman ya naam samajh nahi aaya."}
              
@@ -136,8 +100,5 @@ async def process_voice_command(payload: VoiceRequest):
         return {"status": "SUCCESS", "data": ai_result_array, "msg": msg_hi}
             
     except Exception as e:
-        conn.rollback()
-        logger.error(f"Transaction failure: {str(e)}")
-        raise HTTPException(status_code=500, detail="Database write failed.")
-    finally:
-        conn.close()
+        logger.error(f"Voice processing failure: {str(e)}")
+        raise HTTPException(status_code=500, detail="Voice processing failed.")
