@@ -6984,8 +6984,10 @@
             let price = parseFloat(document.getElementById('nsPrice').value) || 0;
             if (!name) return alert("Item name is required!");
             let totalVal = price * qty;
+            
+            let tempId = Date.now();
             localStock.push({
-                id: Date.now(),
+                id: tempId,
                 name: name,
                 category: cat,
                 quantity: qty,
@@ -6996,12 +6998,12 @@
             });
             if (qty > 0) {
                 localDailyLedger.unshift({
-                    id: Date.now(),
+                    id: tempId,
                     type: 'PURCHASE',
                     item: name,
                     qty: qty,
                     amount: totalVal,
-                    timestamp: Date.now(),
+                    timestamp: tempId,
                     date: new Date().toLocaleString(),
                     note: `Purchased ${name}`
                 });
@@ -7014,6 +7016,20 @@
             document.getElementById('nsCat').value = '';
             document.getElementById('nsQty').value = '';
             document.getElementById('nsPrice').value = '';
+            
+            // Sync to backend
+            let formData = new FormData();
+            formData.append('merchant_id', MERCHANT_ID);
+            formData.append('item_id', String(tempId));
+            formData.append('item_name', name);
+            formData.append('quantity_change', qty);
+            formData.append('unit', unit);
+            formData.append('price', price);
+            
+            fetch(`${RENDER_API_URL}/api/inventory/ADD_STOCK`, {
+                method: 'POST',
+                body: formData
+            }).catch(e => console.warn("Failed to sync new stock to backend:", e));
         }
 
         function initShopSathi() {
