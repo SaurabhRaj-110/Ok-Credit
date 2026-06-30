@@ -26,16 +26,18 @@ class GroqEngine:
         CRITICAL RULES:
         1. "CUSTOMER_PAYMENT": Customer paid money (e.g., Advance, Jama kiya, de diya, account clear, jama kar lo). This subtracts from their balance.
         2. "CUSTOMER_CREDIT": Customer took items on Udhaar/baaki (e.g., udhaar likh do, baki hai, baaki). This adds to their balance.
-        3. "SUPPLIER_PAYMENT": Shopkeeper paid money to supplier/distributor. Subtracts from supplier balance.
-        4. "SUPPLIER_CREDIT": Shopkeeper took maal on credit from supplier. Adds to supplier balance.
+        3. "SUPPLIER_PAYMENT": Shopkeeper paid money to supplier/distributor (e.g., supplier ko paise de diye, payment kar diya). Subtracts from supplier balance.
+        4. "SUPPLIER_CREDIT": Shopkeeper took maal on credit from supplier, OR owes money to supplier (e.g., supplier ka baki likh do, supplier ko dene hain). Adds to supplier balance.
         5. "ADD_STOCK" / "REDUCE_STOCK": For inventory changes. DO NOT confuse people's names with stock items.
-        6. "NAVIGATE_STOCK" / "NAVIGATE_KHATA" / "NAVIGATE_SNAP": Use these if the user wants to navigate to a section (e.g., "stock dikhao", "khata section kholo", "snap scanner open karo"). Do not extract items or amounts for navigation.
-        7. For names of items or people, ALWAYS transliterate Hindi/regional words into English script (e.g., "सौरभ राज" -> "Saurabh Raj", "सलोनी" -> "Saloni"). Do NOT return text in Devanagari.
-        8. Pay close attention to multiple commands for different parties in the same sentence. 
+        6. "NAVIGATE_STOCK" / "NAVIGATE_KHATA" / "NAVIGATE_SNAP": Use these if the user wants to navigate to a section.
+        7. For names of items or people, ALWAYS transliterate Hindi/regional words into English script (e.g., "सौरभ राज" -> "Saurabh Raj"). Do NOT return text in Devanagari.
+        8. If command contains "supplier", "distributor", "wholesaler", "vendor", "company" -> ALWAYS classify as SUPPLIER_PAYMENT or SUPPLIER_CREDIT, and return "party_type": "SUPPLIER".
+        9. If command contains "customer", "grahak", "uncle", "bhaiya", or just a person's name -> ALWAYS classify as CUSTOMER_PAYMENT or CUSTOMER_CREDIT, and return "party_type": "CUSTOMER".
+        10. Pay close attention to multiple commands for different parties in the same sentence. 
            Example: "सलोनी के खाते में 2000 एडवांस और सौरव राज के खाते में 200 रुपए उधार लिख दो" 
            MUST return TWO actions: 
-           - {{"action": "CUSTOMER_PAYMENT", "target_name": "Saloni", "amount": 2000}}
-           - {{"action": "CUSTOMER_CREDIT", "target_name": "Saurabh Raj", "amount": 200}}
+           - {{"action": "CUSTOMER_PAYMENT", "target_name": "Saloni", "party_type": "CUSTOMER", "amount": 2000}}
+           - {{"action": "CUSTOMER_CREDIT", "target_name": "Saurabh Raj", "party_type": "CUSTOMER", "amount": 200}}
 
         The user may speak multiple commands at once (e.g., "5 packet maggi becha aur rahul ne 50 rupaye diye").
         Return a JSON object with an 'actions' key containing an array of objects representing each action:
@@ -47,6 +49,7 @@ class GroqEngine:
                 "quantity": float or null,
                 "unit": string or null,
                 "target_name": string or null (Name of customer or supplier),
+                "party_type": "CUSTOMER" | "SUPPLIER" | null,
                 "amount": float or null
             }}
           ]

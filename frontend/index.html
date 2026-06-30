@@ -3326,7 +3326,7 @@
                 <div style="display:flex; align-items:center; gap:12px; background:white; border-radius:14px; padding:14px; box-shadow:var(--shadow-sm); border:1px solid var(--border);">
                     <div class="lh-avatar" id="bsReviewAvatar" style="width:40px; height:40px; font-size:14px; border:none; background:var(--primary-light); color:var(--primary);">SK</div>
                     <div style="flex:1;">
-                        <div style="font-size:14px; font-weight:700; color:var(--ink-main);" id="bsReviewPartyName">Suresh Kumar</div>
+                        <div style="font-size:14px; font-weight:700; color:var(--ink-main); cursor:pointer;" id="bsReviewPartyName" onclick="editSnapPartyName()">Suresh Kumar <i class="ti ti-pencil" style="font-size:12px; color:var(--primary); margin-left:4px;"></i></div>
                         <div style="font-size:11px; color:var(--ink-muted);" id="bsReviewPartyPhone">+91 98765 43210</div>
                     </div>
                     <div style="font-size:11px; color:var(--ink-muted); text-align:right;" id="bsReviewDateTime">17 Jun 2026<br>10:30 AM</div>
@@ -4122,6 +4122,21 @@
                         body: formData
                     }));
 
+                    promises.push(fetch(`${RENDER_API_URL}/api/sales/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            merchant_id: MERCHANT_ID,
+                            type: d.type,
+                            item: d.itemName,
+                            qty: d.qty,
+                            amount: d.total,
+                            note: ledgerTx.note
+                        })
+                    }));
+
                     if (d.partyObj) {
                         promises.push(fetch(`${RENDER_API_URL}/api/khata/transaction`, {
                             method: 'POST',
@@ -4450,15 +4465,15 @@
                 if (response.ok) {
                     const data = await response.json();
                     if (data.status === 'success') {
-                        // Backend data mapping
                         localStock = data.inventory.map(i => ({
                             id: i.item_id,
                             name: i.item_name,
-                            category: "General",
+                            category: i.category || "General",
                             quantity: i.current_stock,
                             minStock: i.reorder_level || 10,
-                            unit: "items",
+                            unit: i.unit || "items",
                             price: i.price,
+                            purchase_price: i.purchase_price || 0.0,
                             location: "Unassigned"
                         }));
 
@@ -4471,7 +4486,8 @@
                                     amount: t.amount,
                                     date: new Date(t.created_at).toISOString().split('T')[0],
                                     note: t.entry_source || 'Synced Transaction',
-                                    hasReceipt: t.entry_source && t.entry_source.includes("Bill Snap")
+                                    hasReceipt: t.image_path || (t.entry_source && t.entry_source.includes("Bill Snap")),
+                                    image_path: t.image_path || null
                                 };
                                 return mappedTx;
                             });
@@ -4495,6 +4511,20 @@
                             let mapped = parties.find(x => x.id === p.party_id);
                             return mapped;
                         });
+
+                        // Map Daily Sales
+                        if (data.daily_sales) {
+                            localDailyLedger = data.daily_sales.map(s => ({
+                                id: s.sale_id,
+                                type: s.type,
+                                item: s.item,
+                                qty: s.qty,
+                                amount: s.amount,
+                                note: s.note,
+                                timestamp: new Date(s.timestamp + 'Z').getTime(), // Handle UTC
+                                date: new Date(s.timestamp + 'Z').toLocaleString()
+                            }));
+                        }
 
                         saveStateToStorage();
                         renderUI();
@@ -5163,9 +5193,11 @@
             }
 
             let sales = actions.filter(a => a.actionType === 'STOCK' && a.type === 'SALE');
-            let udhaar = actions.filter(a => a.actionType === 'KHATA' && a.type === 'UDHAAR');
-            let advance = actions.filter(a => a.actionType === 'KHATA' && a.type === 'PAYMENT');
             let purchase = actions.filter(a => a.actionType === 'STOCK' && a.type === 'PURCHASE');
+            let custUdhaar = actions.filter(a => a.actionType === 'KHATA' && a.type === 'UDHAAR' && a.personType === 'C');
+            let custAdvance = actions.filter(a => a.actionType === 'KHATA' && a.type === 'PAYMENT' && a.personType === 'C');
+            let supDue = actions.filter(a => a.actionType === 'KHATA' && a.type === 'UDHAAR' && a.personType === 'S');
+            let supPayment = actions.filter(a => a.actionType === 'KHATA' && a.type === 'PAYMENT' && a.personType === 'S');
             let transcriptText = document.getElementById('veTranscriptText') ? document.getElementById('veTranscriptText').innerText : "Voice transcript here";
 
             let html = `
@@ -5214,8 +5246,8 @@
                 `;
             }
 
-            if (udhaar.length > 0) {
-                let totalUdhaar = udhaar.reduce((sum, act) => sum + act.amount, 0);
+            if (custUdhaar.length > 0) {
+                let totalUdhaar = custUdhaar.reduce((sum, act) => sum + act.amount, 0);
                 html += `
                     <div style="margin-bottom:24px;">
                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
@@ -5223,8 +5255,8 @@
                             <div style="font-size:16px; font-weight:800; color:var(--ink-main);">Udhaar (Grahak)</div>
                         </div>
                 `;
-                udhaar.forEach(act => {
-                    let newTag = act.isNew ? `<span style="background:var(--ochre-light); color:var(--ochre); font-size:9px; padding:2px 6px; border-radius:4px; margin-left:6px;">NEW</span>` : '';
+                custUdhaar.forEach(act => {
+                    let newTag = act.isNewPerson ? `<span style="background:var(--ochre-light); color:var(--ochre); font-size:9px; padding:2px 6px; border-radius:4px; margin-left:6px;">NEW</span>` : '';
                     html += `
                         <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--ink-main); margin-bottom:12px; padding-left:28px;">
                             <div style="flex:1;">${act.person.name} ${newTag}</div>
@@ -5242,8 +5274,8 @@
                 `;
             }
 
-            if (advance.length > 0) {
-                let totalAdvance = advance.reduce((sum, act) => sum + act.amount, 0);
+            if (custAdvance.length > 0) {
+                let totalAdvance = custAdvance.reduce((sum, act) => sum + act.amount, 0);
                 html += `
                     <div style="margin-bottom:24px;">
                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
@@ -5251,8 +5283,8 @@
                             <div style="font-size:16px; font-weight:800; color:var(--ink-main);">Advance (Grahak)</div>
                         </div>
                 `;
-                advance.forEach(act => {
-                    let newTag = act.isNew ? `<span style="background:var(--ochre-light); color:var(--ochre); font-size:9px; padding:2px 6px; border-radius:4px; margin-left:6px;">NEW</span>` : '';
+                custAdvance.forEach(act => {
+                    let newTag = act.isNewPerson ? `<span style="background:var(--ochre-light); color:var(--ochre); font-size:9px; padding:2px 6px; border-radius:4px; margin-left:6px;">NEW</span>` : '';
                     html += `
                         <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--ink-main); margin-bottom:12px; padding-left:28px;">
                             <div style="flex:1;">${act.person.name} ${newTag}</div>
@@ -5265,6 +5297,62 @@
                         <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:var(--primary); padding-left:28px; margin-top:12px; border-top:1px dashed var(--border); padding-top:12px;">
                             <div>Total Advance Update</div>
                             <div>+ ₹${totalAdvance}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (supDue.length > 0) {
+                let totalDue = supDue.reduce((sum, act) => sum + act.amount, 0);
+                html += `
+                    <div style="margin-bottom:24px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                            <i class="ti ti-truck" style="color:#d97706; font-size:20px;"></i>
+                            <div style="font-size:16px; font-weight:800; color:var(--ink-main);">Due (Supplier)</div>
+                        </div>
+                `;
+                supDue.forEach(act => {
+                    let newTag = act.isNewPerson ? `<span style="background:var(--ochre-light); color:var(--ochre); font-size:9px; padding:2px 6px; border-radius:4px; margin-left:6px;">NEW</span>` : '';
+                    html += `
+                        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--ink-main); margin-bottom:12px; padding-left:28px;">
+                            <div style="flex:1;">${act.person.name} ${newTag}</div>
+                            <div style="flex:1; color:var(--ink-muted);">Baki (Dene hain)</div>
+                            <div style="width:80px; text-align:right; color:var(--red);">+ ₹${act.amount}</div>
+                        </div>
+                    `;
+                });
+                html += `
+                        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:var(--red); padding-left:28px; margin-top:12px; border-top:1px dashed var(--border); padding-top:12px;">
+                            <div>Total Supplier Due</div>
+                            <div>+ ₹${totalDue}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (supPayment.length > 0) {
+                let totalPayment = supPayment.reduce((sum, act) => sum + act.amount, 0);
+                html += `
+                    <div style="margin-bottom:24px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                            <i class="ti ti-cash" style="color:var(--primary); font-size:20px;"></i>
+                            <div style="font-size:16px; font-weight:800; color:var(--ink-main);">Payment (Supplier)</div>
+                        </div>
+                `;
+                supPayment.forEach(act => {
+                    let newTag = act.isNewPerson ? `<span style="background:var(--ochre-light); color:var(--ochre); font-size:9px; padding:2px 6px; border-radius:4px; margin-left:6px;">NEW</span>` : '';
+                    html += `
+                        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--ink-main); margin-bottom:12px; padding-left:28px;">
+                            <div style="flex:1;">${act.person.name} ${newTag}</div>
+                            <div style="flex:1; color:var(--ink-muted);">Payment Diya</div>
+                            <div style="width:80px; text-align:right; color:var(--primary);">- ₹${act.amount}</div>
+                        </div>
+                    `;
+                });
+                html += `
+                        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:var(--primary); padding-left:28px; margin-top:12px; border-top:1px dashed var(--border); padding-top:12px;">
+                            <div>Total Supplier Payment</div>
+                            <div>- ₹${totalPayment}</div>
                         </div>
                     </div>
                 `;
@@ -5322,7 +5410,8 @@
         }
 
         function getVoicePartyOptions(selectedId, selectedType) {
-            let html = `<option value="NEW">New customer / supplier</option>`;
+            let label = selectedType === 'S' ? 'New Supplier' : 'New Customer';
+            let html = `<option value="NEW">${label}</option>`;
             localKhata.forEach(p => {
                 let selected = selectedType === 'C' && String(p.id) === String(selectedId) ? 'selected' : '';
                 html += `<option value="C-${p.id}" ${selected}>Customer: ${escapeAttr(p.name)}</option>`;
@@ -5424,18 +5513,18 @@
                     newAct.amount = parseFloat(document.getElementById(`veAmount-${idx}`).value) || 0;
 
                     if (partySelect === 'NEW') {
-                        newAct.personType = 'C';
-                        newAct.isNew = true;
+                        newAct.personType = act.personType || 'C';
+                        newAct.isNewPerson = true;
                         newAct.person = {
                             id: 'NEW',
-                            name: document.getElementById(`vePersonNameInput-${idx}`).value.trim() || 'New Customer'
+                            name: document.getElementById(`vePersonNameInput-${idx}`).value.trim() || (newAct.personType === 'S' ? 'New Supplier' : 'New Customer')
                         };
                     } else {
                         let [personType, personId] = partySelect.split('-');
                         let targetArr = personType === 'C' ? localKhata : localSuppliers;
                         let person = targetArr.find(p => String(p.id) === String(personId));
                         newAct.personType = personType;
-                        newAct.isNew = false;
+                        newAct.isNewPerson = false;
                         newAct.person = person || newAct.person;
                     }
                 }
@@ -5472,7 +5561,7 @@
             }
 
             let html = `
-            <div style="display:flex; flex-direction:column; height:100vh; background:#f8fafc; animation: slideUp 0.3s ease;">
+            <div style="display:flex; flex-direction:column; height:100%; background:#f8fafc; animation: slideUp 0.3s ease;">
                 
                 <div class="overlay-header" style="background:white; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
                     <div style="display:flex; align-items:center;">
@@ -5571,32 +5660,43 @@
             overlay.style.display = 'block';
         }
 
-        function saveEditStockModal(index) {
+        async function saveEditStockModal(index) {
             let item = localStock[index];
-            item.name = document.getElementById('esi-name').value || item.name;
-            item.category = document.getElementById('esi-category').value;
-            item.unit = document.getElementById('esi-unit').value || item.unit;
-            item.quantity = parseFloat(document.getElementById('esi-stock').value) || 0;
-            item.minStock = parseFloat(document.getElementById('esi-minstock').value) || 10;
-            item.price = parseFloat(document.getElementById('esi-price').value) || item.price;
+            let newName = document.getElementById('esi-name').value || item.name;
+            let newCat = document.getElementById('esi-category').value;
+            let newUnit = document.getElementById('esi-unit').value || item.unit;
+            let newQty = parseFloat(document.getElementById('esi-stock').value) || 0;
+            let newMinStock = parseFloat(document.getElementById('esi-minstock').value) || 10;
+            let newPurPrice = parseFloat(document.getElementById('esi-purchase').value) || 0;
+            let newPrice = parseFloat(document.getElementById('esi-price').value) || item.price;
 
             document.getElementById('editStockOverlay').style.display = 'none';
-            renderUI();
-            showToast("Item Updated Successfully");
 
             // Inform backend
-            fetch(`${RENDER_API_URL}/api/inventory/adjust`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    merchant_id: MERCHANT_ID,
-                    item_name: item.name,
-                    quantity: 0,
-                    action: 'ADD_STOCK'
-                })
-            }).catch(e => console.error("Stock update error:", e));
+            try {
+                await fetch(`${RENDER_API_URL}/api/inventory/item/${item.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        merchant_id: MERCHANT_ID,
+                        item_name: newName,
+                        category: newCat,
+                        unit: newUnit,
+                        current_stock: newQty,
+                        reorder_level: newMinStock,
+                        purchase_price: newPurPrice,
+                        price: newPrice
+                    })
+                });
+
+                showToast("Item Updated Successfully");
+                await syncDataFromCloud();
+            } catch (e) {
+                console.error("Stock update error:", e);
+                showToast("Error updating item");
+            }
         }
 
         function deleteStockItem(index) {
@@ -5606,7 +5706,7 @@
                 document.getElementById('editStockOverlay').style.display = 'none';
                 renderUI();
                 showToast("Item Deleted");
-                
+
                 if (item && item.id && String(item.id).startsWith("item_")) {
                     fetch(`${RENDER_API_URL}/api/inventory/item/${item.id}?merchant_id=${MERCHANT_ID}`, {
                         method: 'DELETE'
@@ -5779,7 +5879,10 @@
                             <div class="tl-card">
                                 <div class="tl-card-top">
                                     <div class="tl-time">${timeStr}</div>
-                                    <div class="tl-badge" style="background:${badgeBg}; color:${badgeColor};">${typeLabel}</div>
+                                    <div style="display:flex; gap:8px;">
+                                        <div class="tl-badge" style="background:${badgeBg}; color:${badgeColor};">${typeLabel}</div>
+                                        <div style="cursor:pointer; color:var(--ink-muted);" onclick="event.stopPropagation(); openEditSaleModal('${tx.id}')"><i class="ti ti-dots-vertical"></i></div>
+                                    </div>
                                 </div>
                                 <div class="tl-main">
                                     <div>
@@ -5822,6 +5925,83 @@
 
         function closeAddTxModal() {
             document.getElementById('addTxOverlay').style.display = 'none';
+        }
+
+        let editingSaleId = null;
+
+        function openEditSaleModal(saleId) {
+            editingSaleId = saleId;
+            let tx = localDailyLedger.find(s => String(s.id) === String(saleId));
+            if (!tx) return;
+
+            let html = `
+            <div style="background:white; width:100%; height:100%; display:flex; flex-direction:column; animation: slideUp 0.3s ease;">
+                <div style="padding:20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); flex-shrink:0;">
+                    <div style="font-size:20px; font-weight:800;">Edit Sale/Purchase</div>
+                    <i class="ti ti-x" style="font-size:24px; color:var(--ink-muted); cursor:pointer;" onclick="document.getElementById('editSaleOverlay').style.display='none';"></i>
+                </div>
+                
+                <div style="flex:1; overflow-y:auto; padding:20px; background:#f9fafb;">
+                    <div class="form-group" style="margin-bottom:20px;">
+                        <label style="display:block; font-size:12px; font-weight:700; color:var(--ink-muted); margin-bottom:4px;">Item Name</label>
+                        <input type="text" id="esa-item" value="${tx.item || ''}" style="width:100%; padding:14px; border:1px solid var(--border); border-radius:12px; font-size:16px; box-sizing:border-box;">
+                    </div>
+                    
+                    <div style="display:flex; gap:12px; margin-bottom:20px;">
+                        <div class="form-group" style="flex:1;">
+                            <label style="display:block; font-size:12px; font-weight:700; color:var(--ink-muted); margin-bottom:4px;">Quantity</label>
+                            <input type="number" id="esa-qty" value="${tx.qty || 1}" style="width:100%; padding:14px; border:1px solid var(--border); border-radius:12px; font-size:16px; box-sizing:border-box;">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label style="display:block; font-size:12px; font-weight:700; color:var(--ink-muted); margin-bottom:4px;">Total Amount</label>
+                            <input type="number" id="esa-amt" value="${tx.amount}" style="width:100%; padding:14px; border:1px solid var(--border); border-radius:12px; font-size:16px; box-sizing:border-box; font-weight:700;">
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="padding:16px; border-top:1px solid var(--border); background:white; display:flex; gap:12px; flex-shrink:0;">
+                    <button style="flex:1; padding:14px; border:1px solid var(--primary); background:white; border-radius:12px; font-weight:700; color:var(--primary); cursor:pointer;" onclick="document.getElementById('editSaleOverlay').style.display='none';">Cancel</button>
+                    <button style="flex:1.5; padding:14px; border:none; background:var(--primary); border-radius:12px; font-weight:700; color:white; cursor:pointer;" onclick="saveEditSaleModal()">Save Changes</button>
+                </div>
+            </div>
+            `;
+            let overlay = document.getElementById('editSaleOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'editSaleOverlay';
+                overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:none;';
+                document.body.appendChild(overlay);
+            }
+            overlay.innerHTML = html;
+            overlay.style.display = 'block';
+        }
+
+        async function saveEditSaleModal() {
+            let item = document.getElementById('esa-item').value;
+            let qty = parseFloat(document.getElementById('esa-qty').value) || 0;
+            let amt = parseFloat(document.getElementById('esa-amt').value) || 0;
+
+            document.getElementById('editSaleOverlay').style.display = 'none';
+
+            try {
+                await fetch(`${RENDER_API_URL}/api/sales/${editingSaleId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        merchant_id: MERCHANT_ID,
+                        item: item,
+                        qty: qty,
+                        amount: amt
+                    })
+                });
+                showToast("Sale Updated");
+                await syncDataFromCloud();
+            } catch (e) {
+                console.error("Sale update error", e);
+                showToast("Error updating sale");
+            }
         }
 
         function switchAddTxTab(mode) {
@@ -6141,58 +6321,144 @@
                 formData.append('merchant_id', MERCHANT_ID);
                 formData.append('file', file);
 
-                try {
-                    let res = await fetch(`${RENDER_API_URL}/api/snap/process`, {
-                        method: 'POST',
-                        body: formData
-                    });
+                let maxRetries = 3;
+                let retryDelay = 1000;
+                let success = false;
+                let finalError = null;
 
-                    if (!res.ok) {
-                        let errData = await res.json().catch(() => ({}));
-                        throw new Error(errData.detail || `Server Error (${res.status})`);
-                    }
-
-                    let result = await res.json();
-
-                    if (result.status === 'SUCCESS' && result.data && result.data.is_valid_bill) {
-                        bsIsDuplicate = result.data.is_duplicate || false;
-                        bsImagePath = result.data.image_path || null;
-
-                        bsParsedItems = result.data.entries.map(entry => {
-                            let stockItem = findStockItemByName(entry.item_name || "");
-                            let qty = entry.quantity || 1;
-                            let rate = entry.rate || (entry.amount ? (entry.amount / qty) : (stockItem ? stockItem.price : 0));
-                            return {
-                                name: entry.item_name || "Unknown Item",
-                                action: entry.action || (bsContext === 'SALE' ? 'REDUCE_STOCK' : 'ADD_STOCK'),
-                                targetName: entry.target_name || (bsParty ? bsParty.name : "General"),
-                                category: stockItem ? stockItem.category : "General",
-                                unit: stockItem ? stockItem.unit : "Pieces",
-                                qty: qty,
-                                rate: rate,
-                                amount: entry.amount || (qty * rate),
-                                confidence: entry.confidence_score || 100,
-                                needsVerification: entry.needs_verification || false,
-                                matchedStockId: stockItem ? stockItem.id : null
-                            };
+                for (let attempt = 0; attempt < maxRetries; attempt++) {
+                    try {
+                        let res = await fetch(`${RENDER_API_URL}/api/snap/process`, {
+                            method: 'POST',
+                            body: formData
                         });
-                    } else {
-                        showToast("Could not read this bill. Try a clearer image or better lighting.");
-                        bsParsedItems = [];
+
+                        if (!res.ok) {
+                            let errData = await res.json().catch(() => ({}));
+                            throw new Error(errData.detail || `Server Error (${res.status})`);
+                        }
+
+                        let result = await res.json();
+
+                        if (result.status === 'SUCCESS' && result.data && result.data.is_valid_bill) {
+                            bsIsDuplicate = result.data.is_duplicate || false;
+                            bsImagePath = result.data.image_path || null;
+
+                            if (!bsParty && result.data.party_name && result.data.party_name.toUpperCase() !== "GENERAL") {
+                                let pName = result.data.party_name.trim();
+                                let bType = result.data.bill_type || "CUSTOMER";
+                                let targetArr = bType === 'SUPPLIER' ? localSuppliers : localKhata;
+                                let matchedParty = targetArr.find(p => p.name.toLowerCase() === pName.toLowerCase());
+                                if (matchedParty) {
+                                    bsParty = matchedParty;
+                                    bsContext = bType === 'SUPPLIER' ? 'PURCHASE' : 'SALE';
+                                } else {
+                                    bsParty = {
+                                        id: 'temp',
+                                        name: pName,
+                                        phone: '',
+                                        balance: 0,
+                                        type: bType === 'SUPPLIER' ? 'supplier' : 'customer'
+                                    };
+                                    bsContext = bType === 'SUPPLIER' ? 'PURCHASE' : 'SALE';
+                                }
+                            }
+
+                            bsParsedItems = result.data.entries.map(entry => {
+                                let stockItem = findStockItemByName(entry.item_name || "");
+                                let qty = entry.quantity || 1;
+                                let rate = entry.rate || (entry.amount ? (entry.amount / qty) : (stockItem ? stockItem.price : 0));
+                                return {
+                                    name: entry.item_name || "Unknown Item",
+                                    action: entry.action || (bsContext === 'SALE' ? 'REDUCE_STOCK' : 'ADD_STOCK'),
+                                    targetName: entry.target_name || (bsParty ? bsParty.name : "General"),
+                                    category: stockItem ? stockItem.category : "General",
+                                    unit: stockItem ? stockItem.unit : "Pieces",
+                                    qty: qty,
+                                    rate: rate,
+                                    amount: entry.amount || (qty * rate),
+                                    confidence: entry.confidence_score || 100,
+                                    needsVerification: entry.needs_verification || false,
+                                    matchedStockId: stockItem ? stockItem.id : null
+                                };
+                            });
+
+                            // Validate before marking success
+                            if (bsParsedItems.length > 0 && bsParsedItems.some(i => i.name !== "Unknown Item" && i.name !== "")) {
+                                success = true;
+                                break;
+                            } else {
+                                throw new Error("Validation Failed: Empty valid items.");
+                            }
+                        } else {
+                            throw new Error("Validation Failed: Invalid bill or empty items.");
+                        }
+                    } catch (err) {
+                        console.warn(`OCR attempt ${attempt + 1} failed:`, err);
+                        finalError = err;
+
+                        if (attempt < maxRetries - 1) {
+                            document.getElementById('bsAnalyzingFooterTitle').innerText = "AI is busy, retrying...";
+                            document.getElementById('bsAnalyzingFooterSub').innerText = `Attempt ${attempt + 2} of ${maxRetries}`;
+                            await new Promise(r => setTimeout(r, retryDelay));
+                            retryDelay *= 2; // Exponential backoff (1s, 2s, 4s)
+                        }
                     }
-                } catch (err) {
-                    console.error("OCR API failed:", err);
-                    if (err.message.includes("rate limit") || err.message.includes("quota") || err.message.includes("429")) {
-                        showToast("Gemini AI Rate Limit Reached! Please wait 1 minute and try again.");
-                    } else if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
-                        showToast("Backend Server is Offline. Please start your Python backend (uvicorn).");
-                    } else {
-                        showToast(err.message || "Bill scan failed. Please check your internet connection and try again.");
-                    }
-                    bsParsedItems = [];
                 }
 
-                finalizeBillAnalyzingStep();
+                if (success) {
+                    finalizeBillAnalyzingStep();
+                } else {
+                    bsParsedItems = [];
+                    // Show error state in the analyzing overlay directly
+                    document.getElementById('bsAnalyzingTitle').innerText = "Scan Failed";
+                    document.getElementById('bsAnalyzingOrb').innerHTML = `<i class="ti ti-alert-triangle" style="color:#ef4444; font-size:32px;"></i>`;
+                    document.getElementById('bsAnalyzingOrb').style.animation = 'none';
+                    document.getElementById('bsAnalyzingOrb').style.background = '#fef2f2';
+
+                    let errorTitle = "Couldn't read this bill.";
+                    let errorMsg = "Please check lighting and retake the photo.";
+                    let isAuthError = false;
+
+                    if (finalError) {
+                        let errMsg = finalError.message || '';
+                        if (errMsg.includes('401') || errMsg.includes('API_KEY_INVALID') || errMsg.includes('invalid api key')) {
+                            errorTitle = "API Key Invalid.";
+                            errorMsg = "The Gemini API key in backend/.env is incorrect. Please update it.";
+                            isAuthError = true;
+                        } else if (errMsg.includes("rate limit") || errMsg.includes("quota") || errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED")) {
+                            errorTitle = "AI is temporarily busy.";
+                            errorMsg = "Gemini API rate limit reached. You can enter items manually below.";
+                        } else if (errMsg.includes("Failed to fetch") || errMsg.includes("NetworkError") || errMsg.includes("ERR_CONNECTION_REFUSED")) {
+                            errorTitle = "Backend Server is Offline.";
+                            errorMsg = "Please start your Python backend server.";
+                        }
+                    }
+
+                    document.getElementById('bsAnalyzingFooterTitle').innerText = errorTitle;
+                    document.getElementById('bsAnalyzingFooterTitle').style.color = "#dc2626";
+                    document.getElementById('bsAnalyzingFooterSub').innerText = errorMsg;
+
+                    // Add retry/cancel/manual buttons directly to the analyzing UI
+                    let footer = document.getElementById('bsAnalyzingFooter');
+                    let existingBtns = document.getElementById('bsErrorBtns');
+                    if (existingBtns) existingBtns.remove();
+
+                    let btnHtml = `
+                    <div id="bsErrorBtns" style="display:flex; gap:10px; margin-top:16px; width:100%; flex-wrap:wrap;">
+                        <button style="flex:1; min-width:100px; padding:12px; border:1px solid #dc2626; background:white; color:#dc2626; border-radius:8px; font-weight:700;" onclick="document.getElementById('billAnalyzingOverlay').style.display='none';">Cancel</button>
+                        <button style="flex:1; min-width:100px; padding:12px; border:none; background:#dc2626; color:white; border-radius:8px; font-weight:700;" onclick="document.getElementById('cameraInputReal').click(); document.getElementById('billAnalyzingOverlay').style.display='none';">Upload Again</button>
+                        ${!isAuthError ? `<button style="width:100%; padding:12px; border:none; background:#6366f1; color:white; border-radius:8px; font-weight:700; margin-top:4px;" onclick="openManualBillEntry()">✏️ Enter Manually</button>` : ''}
+                    </div>`;
+                    footer.insertAdjacentHTML('beforeend', btnHtml);
+
+                    // Mark checklist items as failed
+                    document.querySelectorAll('#bsCheckList .bs-check-row.pending').forEach(r => {
+                        r.classList.remove('pending');
+                        r.classList.add('failed');
+                        r.querySelector('.bs-dot').innerHTML = '<i class="ti ti-x" style="color:#ef4444;"></i>';
+                    });
+                }
 
                 e.target.value = '';
             }
@@ -6320,6 +6586,24 @@
             document.getElementById('bsImpactList').innerHTML = html;
         }
 
+        function editSnapPartyName() {
+            let newName = prompt("Edit Party Name (will be updated for this bill):", bsParty ? bsParty.name : "General Sale");
+            if (newName !== null && newName.trim() !== "") {
+                if (!bsParty || bsParty.id === 'temp') {
+                    bsParty = {
+                        id: 'temp',
+                        name: newName.trim(),
+                        phone: '',
+                        balance: 0,
+                        type: bsContext === 'PURCHASE' ? 'supplier' : 'customer'
+                    };
+                } else {
+                    bsParty.name = newName.trim();
+                }
+                openBillReviewStep(); // re-render
+            }
+        }
+
         function openBillReviewStep() {
             try {
                 let isSale = bsContext === 'SALE';
@@ -6336,11 +6620,11 @@
                     avatar.innerHTML = initials;
                     avatar.style.background = isSale ? avColors[sum % avColors.length] : '#d97706';
                     avatar.style.color = 'white';
-                    document.getElementById('bsReviewPartyName').innerText = bsParty.name;
+                    document.getElementById('bsReviewPartyName').innerHTML = bsParty.name + ' <i class="ti ti-pencil" style="font-size:12px; color:var(--primary); margin-left:4px;"></i>';
                     document.getElementById('bsReviewPartyPhone').innerText = bsParty.phone ? `+91 ${bsParty.phone}` : '';
                     document.getElementById('bsReviewDateTime').innerHTML = formatDate(getTodayStr()) + "<br>" + formatTime(Date.now());
                 } else {
-                    document.getElementById('bsReviewPartyName').innerText = "General Sale";
+                    document.getElementById('bsReviewPartyName').innerHTML = 'General Sale <i class="ti ti-pencil" style="font-size:12px; color:var(--primary); margin-left:4px;"></i>';
                     document.getElementById('bsReviewPartyPhone').innerText = "";
                     document.getElementById('bsReviewAvatar').innerHTML = "GS";
                     document.getElementById('bsReviewAvatar').style.background = "var(--ink-muted)";
@@ -6364,9 +6648,36 @@
 
         let bsLastSaveSummary = null;
 
+        // Manual fallback when OCR fails
+        function openManualBillEntry() {
+            // Close the error overlay
+            document.getElementById('billAnalyzingOverlay').style.display = 'none';
+
+            // Pre-fill with 3 blank rows so user can type items directly
+            bsParsedItems = [
+                { name: "", action: bsContext === 'SALE' ? 'REDUCE_STOCK' : 'ADD_STOCK', targetName: bsParty ? bsParty.name : "General", category: "General", unit: "Pieces", qty: 1, rate: 0, amount: 0, confidence: 100, needsVerification: false, matchedStockId: null },
+                { name: "", action: bsContext === 'SALE' ? 'REDUCE_STOCK' : 'ADD_STOCK', targetName: bsParty ? bsParty.name : "General", category: "General", unit: "Pieces", qty: 1, rate: 0, amount: 0, confidence: 100, needsVerification: false, matchedStockId: null },
+                { name: "", action: bsContext === 'SALE' ? 'REDUCE_STOCK' : 'ADD_STOCK', targetName: bsParty ? bsParty.name : "General", category: "General", unit: "Pieces", qty: 1, rate: 0, amount: 0, confidence: 100, needsVerification: false, matchedStockId: null }
+            ];
+            bsIsDuplicate = false;
+            bsImagePath = null;
+
+            // Open review in edit mode
+            bsEditMode = true;
+            openBillReviewStep();
+            // Force edit mode toggle
+            setTimeout(() => {
+                document.getElementById('bsReviewEditToggle').innerText = 'Done';
+                document.getElementById('bsEditItemsBtn').innerText = 'Done Editing';
+                renderBillReviewItems();
+            }, 100);
+        }
+
         async function confirmAndSaveBillSnap() {
+            // Filter out blank rows (from manual entry)
+            bsParsedItems = bsParsedItems.filter(i => i.name && i.name.trim() !== "");
             if (bsParsedItems.length === 0) {
-                showToast("No items to save.");
+                showToast("Please add at least one item before saving.");
                 return;
             }
             let hasUnverified = bsParsedItems.some(i => i.needsVerification);
@@ -6700,7 +7011,7 @@
                 let amtStr = tx.amount ? `${sign}₹${tx.amount}` : '';
                 let subText = tx.type === 'order' && tx.dueDate ? `Due: ${formatDate(tx.dueDate)}` : (tx.note || '');
 
-                let receiptHtml = tx.hasReceipt ? `<div style="margin-top: 10px; width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);"><img src="https://images.unsplash.com/photo-1620063236056-fcf900cb3fb5?auto=format&fit=crop&q=80&w=400&h=150" style="width:100%; height:120px; object-fit:cover; display:block;" alt="Receipt Note"></div>` : '';
+                let receiptHtml = tx.image_path ? `<div style="margin-top: 10px; width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);"><a href="${RENDER_API_URL}/${tx.image_path}" target="_blank"><img src="${RENDER_API_URL}/${tx.image_path}" style="width:100%; height:120px; object-fit:cover; display:block;" alt="Receipt Note"></a></div>` : (tx.hasReceipt ? `<div style="margin-top: 10px; width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);"><img src="https://images.unsplash.com/photo-1620063236056-fcf900cb3fb5?auto=format&fit=crop&q=80&w=400&h=150" style="width:100%; height:120px; object-fit:cover; display:block;" alt="Receipt Note"></div>` : '');
 
                 txHtml += `<div class="tx-row" style="flex-direction:column; align-items:flex-start;">
                             <div class="tx-top">
@@ -6984,7 +7295,7 @@
             let price = parseFloat(document.getElementById('nsPrice').value) || 0;
             if (!name) return alert("Item name is required!");
             let totalVal = price * qty;
-            
+
             let tempId = Date.now();
             localStock.push({
                 id: tempId,
@@ -7016,7 +7327,7 @@
             document.getElementById('nsCat').value = '';
             document.getElementById('nsQty').value = '';
             document.getElementById('nsPrice').value = '';
-            
+
             // Sync to backend
             let formData = new FormData();
             formData.append('merchant_id', MERCHANT_ID);
@@ -7025,7 +7336,7 @@
             formData.append('quantity_change', qty);
             formData.append('unit', unit);
             formData.append('price', price);
-            
+
             fetch(`${RENDER_API_URL}/api/inventory/ADD_STOCK`, {
                 method: 'POST',
                 body: formData

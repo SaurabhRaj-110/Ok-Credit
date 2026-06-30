@@ -3,5 +3,5 @@ python-multipart
 uvicorn
 pydantic
 pydantic-settings
-google-generativeai
+google-genai
 groq

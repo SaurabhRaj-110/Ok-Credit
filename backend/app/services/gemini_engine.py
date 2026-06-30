@@ -5,7 +5,7 @@ import warnings
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-import google.generativeai as genai
+from google import genai
 
 logger = logging.getLogger("ShopSathiAI")
 
@@ -16,10 +16,8 @@ class GeminiEngine:
         if not api_key:
             logger.warning("GEMINI_API_KEY is not set in environment variables.")
             raise ValueError("GEMINI_API_KEY is not set")
-        genai.configure(api_key=api_key)
-        
-        # Hardcoded to 2.0-flash 
-        self.model = genai.GenerativeModel('models/gemini-2.0-flash')
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = 'models/gemini-2.5-flash'
 
     def extract_intent(self, text: str) -> dict:
         prompt = f"""
@@ -54,12 +52,12 @@ class GeminiEngine:
         Do not wrap in markdown, return raw JSON array.
         """
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(model=self.model_name, contents=prompt)
             raw_json = response.text.replace("```json", "").replace("```", "").strip()
             logger.info(f"AI Extraction: {raw_json}")
             return json.loads(raw_json)
         except Exception as e:
             logger.error(f"Gemini Engine crash. Reason: {e}")
-            if "quota" in str(e).lower() or "429" in str(e):
+            if "quota" in str(e).lower() or "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
                 return {"action": "RATE_LIMIT"}
             return {"action": "UNKNOWN"}

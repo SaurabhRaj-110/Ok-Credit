@@ -74,7 +74,9 @@ async def process_voice_command(payload: VoiceRequest):
                 if not target_name or not amount:
                     continue
                 
-                party_type = "SUPPLIER" if "SUPPLIER" in action else "CUSTOMER"
+                party_type = ai_result.get("party_type")
+                if not party_type:
+                    party_type = "SUPPLIER" if "SUPPLIER" in action else "CUSTOMER"
                 role_str = "Grahak" if party_type == "CUSTOMER" else "Supplier"
                 actions_processed.append(f"{target_name} ({role_str}) ke khate mein ₹{amount} update honge.")
                 

@@ -12,6 +12,16 @@ class ItemCreate(BaseModel):
     current_stock: float
     price: float
 
+class ItemUpdate(BaseModel):
+    merchant_id: str
+    item_name: str
+    category: str
+    unit: str
+    current_stock: float
+    reorder_level: float
+    price: float
+    purchase_price: float
+
 class StockAdjust(BaseModel):
     merchant_id: str
     quantity_change: float # Positive to add stock, negative to remove
@@ -43,6 +53,21 @@ def adjust_stock(item_id: str, adjust: StockAdjust):
             """, (adjust.quantity_change, item_id, adjust.merchant_id))
             conn.commit()
             return {"status": "success", "message": "Stock adjusted successfully!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/item/{item_id}")
+def update_item_full(item_id: str, update: ItemUpdate):
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE inventory 
+                SET item_name = ?, category = ?, unit = ?, current_stock = ?, reorder_level = ?, price = ?, purchase_price = ?
+                WHERE item_id = ? AND merchant_id = ?
+            """, (update.item_name, update.category, update.unit, update.current_stock, update.reorder_level, update.price, update.purchase_price, item_id, update.merchant_id))
+            conn.commit()
+            return {"status": "success", "message": "Item updated fully successfully!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

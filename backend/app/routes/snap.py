@@ -11,7 +11,8 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
 from pydantic import BaseModel
 from typing import List, Optional
 from sqlite3 import Connection
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from app.config import settings
 from app.database import get_db_connection
@@ -19,10 +20,12 @@ from app.database import get_db_connection
 logger = logging.getLogger("ShopSathiSnap")
 router = APIRouter()
 
-# Initialize Gemini Client
+# Initialize Gemini Client using the new google-genai SDK
 try:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
+    gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    logger.info("Gemini client initialized successfully.")
 except Exception as e:
+    gemini_client = None
     logger.error(f"Gemini AI Init Error: {e}")
 
 class SnapEntry(BaseModel):
@@ -85,7 +88,7 @@ You are a highly accurate OCR system specialized in reading Indian Kirana (groce
 
 ANALYZE this image carefully.
 
-STEP 1: Determine if this is a valid bill/invoice/ledger. If not (e.g., random photo, scenery, face), return: {"is_valid_bill": false}
+STEP 1: Determine if this is a valid bill/invoice/ledger. If not (e.g., random photo, scenery, face), return: {"is_valid_bill": false, "entries": []}
 
 STEP 2: If valid, read EVERY line item with extreme care:
 - Read handwritten text character by character
@@ -132,45 +135,87 @@ CRITICAL RULES:
 - If an image shows multiple parties, create entries for ALL of them and accurately tag their "target_name" and "action".
 - Common Indian grocery items: Maggi, Parle-G, Amul, Britannia, Atta (flour), Chawal (rice), Dal, Chini (sugar), Tel (oil), Namak (salt), Doodh (milk), Sabun (soap), Masala.
 - Each entry should have at minimum: item_name.
+- If NO valid items are found, YOU MUST RETURN "is_valid_bill": false and an empty "entries" array.
 """
 
-        target_model = "models/gemini-2.0-flash"
-        model = genai.GenerativeModel(model_name=target_model)
+        # Try models in order of reliability on free tier
+        # gemini-2.5-flash is the most capable and has quota available
+        models_to_try = ["models/gemini-2.5-flash", "models/gemini-2.5-flash-lite", "models/gemini-2.0-flash-lite"]
+        raw_text = None
+        extracted_data = None
+        last_error = None
         
-        response = model.generate_content([
-            system_instruction, 
-            {"mime_type": file.content_type, "data": image_bytes}
-        ])
+        if gemini_client is None:
+            raise HTTPException(status_code=500, detail="Gemini client not initialized. Check your API key.")
         
-        raw_text = response.text.strip()
-        
-        # Robustly extract JSON block
-        if "```json" in raw_text:
-            raw_text = raw_text.split("```json")[1].split("```")[0].strip()
-        elif "```" in raw_text:
-            raw_text = raw_text.split("```")[1].split("```")[0].strip()
+        for attempt, target_model in enumerate(models_to_try):
+            try:
+                logger.info(f"Trying OCR with model {target_model} (Attempt {attempt+1})")
+                
+                response = gemini_client.models.generate_content(
+                    model=target_model,
+                    contents=[
+                        system_instruction,
+                        types.Part.from_bytes(data=image_bytes, mime_type=file.content_type)
+                    ]
+                )
+                
+                raw_text = response.text.strip()
+                
+                # Robustly extract JSON block
+                if "```json" in raw_text:
+                    raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in raw_text:
+                    raw_text = raw_text.split("```")[1].split("```")[0].strip()
+                    
+                start_idx = raw_text.find('{')
+                end_idx = raw_text.rfind('}')
+                if start_idx != -1 and end_idx != -1:
+                    raw_text = raw_text[start_idx:end_idx+1]
+                    
+                extracted_data = json.loads(raw_text)
+                if isinstance(extracted_data, list):
+                    extracted_data = {
+                        "is_valid_bill": True,
+                        "party_name": "General",
+                        "bill_type": "UNKNOWN",
+                        "total_amount": 0.0,
+                        "entries": extracted_data
+                    }
+                elif not isinstance(extracted_data, dict):
+                    extracted_data = {}
+                
+                last_error = None
+                break # Success! Break out of the retry loop
+                
+            except json.JSONDecodeError as je:
+                logger.error(f"JSON Parse Error on {target_model}: {je}. Text: {raw_text}")
+                last_error = ("json_parse", str(je))
+                # Try next model
+            except Exception as e:
+                error_str = str(e)
+                logger.error(f"OCR model {target_model} failed: {error_str}")
+                # Detect auth/invalid key errors — no point retrying other models
+                if "API_KEY_INVALID" in error_str or "invalid api key" in error_str.lower() or "401" in error_str or "403" in error_str or "UNAUTHENTICATED" in error_str:
+                    last_error = ("auth_error", error_str)
+                    break  # Auth errors won't be fixed by retrying another model
+                elif "429" in error_str or "quota" in error_str.lower() or "rate_limit" in error_str.lower() or "RESOURCE_EXHAUSTED" in error_str:
+                    last_error = ("rate_limit", error_str)
+                    # Continue to try next model
+                else:
+                    last_error = ("general", error_str)
+                    # Continue to try next model
             
-        start_idx = raw_text.find('{')
-        end_idx = raw_text.rfind('}')
-        if start_idx != -1 and end_idx != -1:
-            raw_text = raw_text[start_idx:end_idx+1]
-            
-        try:
-            extracted_data = json.loads(raw_text)
-            if isinstance(extracted_data, list):
-                extracted_data = {
-                    "is_valid_bill": True,
-                    "party_name": "General",
-                    "bill_type": "UNKNOWN",
-                    "total_amount": 0.0,
-                    "entries": extracted_data
-                }
-            elif not isinstance(extracted_data, dict):
-                extracted_data = {}
-        except json.JSONDecodeError as je:
-            logger.error(f"JSON Parse Error: {je} on text: {raw_text}")
-            raise ValueError("Failed to parse JSON from AI response")
-            
+        if last_error is not None:
+            err_type, err_msg = last_error
+            logger.error(f"All OCR models failed. Last error type: {err_type}, msg: {err_msg}")
+            if err_type == "auth_error":
+                raise HTTPException(status_code=401, detail="GEMINI_API_KEY is invalid. Please update your API key in the backend .env file.")
+            elif err_type == "rate_limit":
+                raise HTTPException(status_code=429, detail="Gemini API rate limit exceeded. Please wait a minute and try again.")
+            else:
+                raise HTTPException(status_code=500, detail="Could not process the image via Gemini Vision. Please try again.")
+                
         extracted_data['image_path'] = filepath
         
         if not extracted_data.get('is_valid_bill', True): # Default to True if missing
@@ -216,11 +261,15 @@ CRITICAL RULES:
 
         return {"status": "SUCCESS", "data": extracted_data}
         
+    except HTTPException:
+        raise  # Re-raise our own HTTP exceptions
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Snap Process Error: {error_msg}")
-        if "429" in error_msg or "quota" in error_msg.lower():
+        if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
             raise HTTPException(status_code=429, detail="Gemini API rate limit exceeded. Please wait a minute and try again.")
+        if "API_KEY_INVALID" in error_msg or "401" in error_msg:
+            raise HTTPException(status_code=401, detail="GEMINI_API_KEY is invalid. Please update your API key.")
         raise HTTPException(status_code=500, detail="Could not process the image via Gemini Vision.")
 
 @router.post("/confirm", status_code=status.HTTP_200_OK)
@@ -273,6 +322,15 @@ async def confirm_snap_entries(payload: ConfirmPayload):
                     (new_item_id, payload.merchant_id, entry.item_name, new_stock, float(entry.rate or 0.0))
                 )
 
+            # Insert into daily_sales
+            sale_id = f"sale_{uuid.uuid4().hex[:10]}"
+            sale_type = "PURCHASE" if is_addition else "SALE"
+            note = f"Bill Snap {sale_type}" + (f" ({payload.party_name})" if payload.party_name else "")
+            cursor.execute(
+                "INSERT INTO daily_sales (sale_id, merchant_id, type, item, qty, amount, note) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (sale_id, payload.merchant_id, sale_type, entry.item_name, qty, amt, note)
+            )
+
             # 2. Track Khata Updates
             if "CREDIT" in entry.action or "REPAYMENT" in entry.action:
                 p_type = "SUPPLIER" if "SUPPLIER" in entry.action else "CUSTOMER"
@@ -293,8 +351,8 @@ async def confirm_snap_entries(payload: ConfirmPayload):
                 balance_change = p_data['amount'] if p_data['is_credit'] else -p_data['amount']
                 txn_id = f"txn_{uuid.uuid4().hex[:6]}"
                 cursor.execute(
-                    "INSERT INTO transactions (transaction_id, party_id, merchant_id, amount, txn_type, entry_source, voice_transcript) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (txn_id, p_id, payload.merchant_id, p_data['amount'], p_data['txn_type'], "LLAMA_OCR", f"Bill ID: {bill_id}")
+                    "INSERT INTO transactions (transaction_id, party_id, merchant_id, amount, txn_type, entry_source, voice_transcript, image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (txn_id, p_id, payload.merchant_id, p_data['amount'], p_data['txn_type'], "LLAMA_OCR", f"Bill ID: {bill_id}", payload.image_path)
                 )
                 cursor.execute(
                     "UPDATE parties SET total_balance = total_balance + ? WHERE party_id = ?",

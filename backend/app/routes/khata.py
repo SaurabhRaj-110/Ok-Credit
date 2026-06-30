@@ -127,11 +127,16 @@ def sync_all_data(merchant_id: str):
             # Fetch all Stock/Inventory
             cursor.execute("SELECT * FROM inventory WHERE merchant_id = ?", (merchant_id,))
             inventory = [dict(row) for row in cursor.fetchall()]
+
+            # Fetch daily sales
+            cursor.execute("SELECT * FROM daily_sales WHERE merchant_id = ? ORDER BY timestamp DESC", (merchant_id,))
+            daily_sales = [dict(row) for row in cursor.fetchall()]
             
             return {
                 "status": "success",
                 "parties": parties,
-                "inventory": inventory
+                "inventory": inventory,
+                "daily_sales": daily_sales
             }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
