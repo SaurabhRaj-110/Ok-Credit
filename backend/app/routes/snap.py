@@ -323,8 +323,8 @@ async def confirm_snap_entries(payload: ConfirmPayload):
                 new_item_id = f"item_{uuid.uuid4().hex[:6]}"
                 new_stock = qty if is_addition else 0
                 cursor.execute(
-                    "INSERT INTO inventory (item_id, merchant_id, item_name, current_stock, reorder_level, price) VALUES (?, ?, ?, ?, 10.0, ?)",
-                    (new_item_id, payload.merchant_id, entry.item_name, new_stock, float(entry.rate or 0.0))
+                    "INSERT INTO inventory (item_id, merchant_id, item_name, current_stock, reorder_level, price, entry_source) VALUES (?, ?, ?, ?, 10.0, ?, ?)",
+                    (new_item_id, payload.merchant_id, entry.item_name, new_stock, float(entry.rate or 0.0), "KhataSnap")
                 )
 
             # Insert into daily_sales
@@ -332,8 +332,8 @@ async def confirm_snap_entries(payload: ConfirmPayload):
             sale_type = "PURCHASE" if is_addition else "SALE"
             note = f"Bill Snap {sale_type}" + (f" ({payload.party_name})" if payload.party_name else "")
             cursor.execute(
-                "INSERT INTO daily_sales (sale_id, merchant_id, type, item, qty, amount, note) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (sale_id, payload.merchant_id, sale_type, entry.item_name, qty, amt, note)
+                "INSERT INTO daily_sales (sale_id, merchant_id, type, item, qty, amount, note, entry_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (sale_id, payload.merchant_id, sale_type, entry.item_name, qty, amt, note, "KhataSnap")
             )
 
             # 2. Track Khata Updates
@@ -381,6 +381,18 @@ async def confirm_snap_entries(payload: ConfirmPayload):
                 )
                 
         conn.commit()
+        
+        from app.routes.notifications import generate_notification
+        generate_notification(
+            merchant_id=payload.merchant_id,
+            title="KhataSnap Processed",
+            message=f"Bill of ₹{payload.total_amount} processed and items added.",
+            type="success",
+            category="System",
+            reference_id=bill_id,
+            reference_type="BILL"
+        )
+        
         return {"status": "SUCCESS", "msg": "Bill successfully digitized.", "bill_id": bill_id}
     except Exception as e:
         conn.rollback()

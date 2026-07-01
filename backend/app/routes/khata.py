@@ -63,6 +63,18 @@ def create_party(party: PartyCreate):
                 """, (txn_id, party_id, party.merchant_id, abs(party.initial_balance), txn_type, "Opening Balance"))
             
             conn.commit()
+            
+            from app.routes.notifications import generate_notification
+            generate_notification(
+                merchant_id=party.merchant_id,
+                title="New Account Created",
+                message=f"Added {party.name} as a {party.party_type.lower()}.",
+                type="info",
+                category="Khata",
+                reference_id=party_id,
+                reference_type="PARTY"
+            )
+            
             return {"status": "success", "party_id": party_id, "message": "Account created!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -88,6 +100,33 @@ def add_transaction(tx: TransactionCreate):
             """, (balance_change, tx.party_id, tx.merchant_id))
             
             conn.commit()
+            
+            from app.routes.notifications import generate_notification
+            
+            # Fetch party name for better notification
+            cursor.execute("SELECT name, party_type FROM parties WHERE party_id = ? AND merchant_id = ?", (tx.party_id, tx.merchant_id))
+            row = cursor.fetchone()
+            party_name = row["name"] if row else "Party"
+            
+            title = ""
+            msg = ""
+            if tx.txn_type == "GIVEN":
+                title = "New Udhaar Added"
+                msg = f"{party_name} - ₹{tx.amount} udhaar added."
+            else:
+                title = "Payment Received"
+                msg = f"₹{tx.amount} payment received from {party_name}."
+                
+            generate_notification(
+                merchant_id=tx.merchant_id,
+                title=title,
+                message=msg,
+                type="success",
+                category="Khata",
+                reference_id=txn_id,
+                reference_type="TRANSACTION"
+            )
+            
             return {"status": "success", "transaction_id": txn_id, "message": "Transaction saved!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

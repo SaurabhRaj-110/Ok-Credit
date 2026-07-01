@@ -5979,7 +5979,9 @@
                 document.getElementById('atPartyHint').innerText = "You can link this sale to a customer udhaar (optional).";
                 document.getElementById('atItemsTitle').innerText = "Items in This Sale";
                 document.getElementById('atSummaryTotal').style.color = "var(--primary)";
-                localKhata.forEach(c => { optionsHtml += `<option value="C-${c.id}">${c.name}</option>`; });
+                localKhata.forEach(c => {
+                    optionsHtml += `<option value="C-${c.id}">${c.name}</option>`;
+                });
             }
             if (mode === 'PURCHASE') {
                 tab.classList.add('purchase');
@@ -5990,7 +5992,9 @@
                 document.getElementById('atPartyHint').innerText = "You can link this purchase to a supplier account (optional).";
                 document.getElementById('atItemsTitle').innerText = "Items in This Purchase";
                 document.getElementById('atSummaryTotal').style.color = "var(--purple)";
-                localSuppliers.forEach(s => { optionsHtml += `<option value="S-${s.id}">${s.name}</option>`; });
+                localSuppliers.forEach(s => {
+                    optionsHtml += `<option value="S-${s.id}">${s.name}</option>`;
+                });
             }
             partySelect.innerHTML = optionsHtml;
             renderTxCart();
@@ -6010,9 +6014,9 @@
                 </div>`;
             } else {
                 listEl.innerHTML = txCartItems.map((item, idx) => {
-                    let emoji = getStockEmoji(item.stockItem ? item.stockItem.category : 'General');
-                    let stockInfo = item.stockItem ? `${item.stockItem.quantity} ${item.unit}` : '';
-                    return `<div style="background:white; border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:10px; display:flex; align-items:center; gap:10px;">
+                            let emoji = getStockEmoji(item.stockItem ? item.stockItem.category : 'General');
+                            let stockInfo = item.stockItem ? `${item.stockItem.quantity} ${item.unit}` : '';
+                            return `<div style="background:white; border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:10px; display:flex; align-items:center; gap:10px;">
                         <div style="width:44px; height:44px; background:#f0fdf4; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; border:1px solid #d1fae5;">${emoji}</div>
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:13px; font-weight:700; color:var(--ink-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.name}</div>
@@ -7572,4 +7576,563 @@
     </script>
 </body>
 
+</html> }
+</script>
+</body>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+            if (success) {
+                closeModal('txModal');
+                renderLedgerView();
+            }
+        }
+
+        let currentModalPartyType = {
+            pa: 'C',
+            um: 'C'
+        };
+
+        function toggleModalParty(modalPrefix, type) {
+            currentModalPartyType[modalPrefix] = type;
+            document.getElementById(`tog-${modalPrefix}-c`).classList.toggle('active', type === 'C');
+            document.getElementById(`tog-${modalPrefix}-s`).classList.toggle('active', type === 'S');
+            let selectEl = document.getElementById(modalPrefix === 'pa' ? 'paPartySelect' : 'umCustomerSelect');
+            let opts = '<option value="">Select...</option>';
+            if (type === 'C') {
+                localKhata.forEach(c => opts += `<option value="C-${c.id}">${c.name} (₹${c.balance} baaki)</option>`);
+            } else {
+                localSuppliers.forEach(s => opts += `<option value="S-${s.id}">${s.name} (₹${s.balance} dena hai)</option>`);
+            }
+            selectEl.innerHTML = opts;
+        }
+
+        function openUdhaarMinusModal() {
+            toggleModalParty('um', 'C');
+            document.getElementById('umAmount').value = '';
+            openModal('udhaarMinusModal');
+        }
+
+        function openPaymentAayaModal() {
+            toggleModalParty('pa', 'C');
+            document.getElementById('paAmount').value = '';
+            openModal('paymentAayaModal');
+        }
+
+        function saveGlobalPayment(selectId, amountId, actionType) {
+            try {
+                let val = document.getElementById(selectId).value;
+                let amt = parseFloat(document.getElementById(amountId).value);
+                if (!val || !amt) return alert("Details bharo!");
+                let type = val.split('-')[0];
+                let id = parseInt(val.split('-')[1]);
+                let person = (type === 'C') ? localKhata.find(c => c.id === id) : localSuppliers.find(s => s.id === id);
+                if (person) {
+                    person.balance -= amt;
+                    person.transactions.unshift({
+                        id: Date.now(),
+                        type: 'payment',
+                        amount: amt,
+                        date: getTodayStr(),
+                        note: actionType === 'minus' ? 'Udhaar Minus' : 'Payment Aaya'
+                    });
+                    if (type === 'C') {
+                        todaySales += amt;
+                        localDailyLedger.unshift({
+                            id: Date.now(),
+                            type: 'PAYMENT_RECEIVED',
+                            item: 'Global Payment',
+                            qty: 0,
+                            amount: amt,
+                            timestamp: Date.now(),
+                            date: new Date().toLocaleString(),
+                            note: `Payment from ${person.name}`
+                        });
+                    }
+                    fetch(`${RENDER_API_URL}/api/khata/transaction`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            party_id: String(person.id),
+                            merchant_id: MERCHANT_ID,
+                            amount: amt,
+                            txn_type: 'GOT',
+                            entry_source: 'Global Payment'
+                        })
+                    }).catch(e => console.warn(e));
+                }
+                saveStateToStorage();
+                closeModal('udhaarMinusModal');
+                closeModal('paymentAayaModal');
+                showToast(`₹${amt} Saved!`);
+                renderUI();
+            } catch (e) {
+                showToast("⚠️ Entry fail ho gayi.");
+            }
+        }
+
+        function saveNewCustomer() {
+            let name = document.getElementById('newCustName').value;
+            let phone = document.getElementById('newCustPhone').value;
+            let bal = parseFloat(document.getElementById('newCustBalance').value) || 0;
+            let balType = document.getElementById('newCustBalType').value;
+            if (!name) return alert("Naam zaruri hai!");
+            if (balType === 'advance') bal = -Math.abs(bal);
+            let cust = {
+                id: Date.now(),
+                name: name,
+                phone: phone,
+                balance: bal,
+                days: 0,
+                transactions: []
+            };
+            if (bal !== 0) cust.transactions.push({
+                id: Date.now(),
+                type: bal > 0 ? 'udhaar' : 'payment',
+                amount: Math.abs(bal),
+                date: getTodayStr(),
+                note: 'Opening Balance'
+            });
+            localKhata.push(cust);
+            saveStateToStorage();
+            closeModal('addCustomerModal');
+            renderUI();
+            showToast("Customer Added!");
+            document.getElementById('newCustName').value = '';
+            document.getElementById('newCustPhone').value = '';
+            document.getElementById('newCustBalance').value = '';
+            fetch(`${RENDER_API_URL}/api/khata/party`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    merchant_id: MERCHANT_ID,
+                    name: name,
+                    phone_number: phone,
+                    party_type: "CUSTOMER",
+                    initial_balance: bal
+                })
+            }).catch(e => console.warn(e));
+        }
+
+        function saveNewSupplier() {
+            let name = document.getElementById('newSupName').value;
+            let bal = parseFloat(document.getElementById('newSupBalance').value) || 0;
+            let balType = document.getElementById('newSupBalType').value;
+            if (!name) return alert("Company naam zaruri hai!");
+            if (balType === 'advance') bal = -Math.abs(bal);
+            let sup = {
+                id: Date.now(),
+                name: name,
+                phone: "",
+                balance: bal,
+                days: 0,
+                transactions: []
+            };
+            if (bal !== 0) sup.transactions.push({
+                id: Date.now(),
+                type: bal > 0 ? 'udhaar' : 'payment',
+                amount: Math.abs(bal),
+                date: getTodayStr(),
+                note: 'Opening Balance'
+            });
+            localSuppliers.push(sup);
+            saveStateToStorage();
+            closeModal('addSupplierModal');
+            renderUI();
+            showToast("Supplier Added!");
+            fetch(`${RENDER_API_URL}/api/khata/party`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    merchant_id: MERCHANT_ID,
+                    name: name,
+                    phone_number: "",
+                    party_type: "SUPPLIER",
+                    initial_balance: bal
+                })
+            }).catch(e => console.warn(e));
+        }
+
+        function saveNewStock() {
+            let name = document.getElementById('nsName').value;
+            let cat = document.getElementById('nsCat').value || 'General';
+            let qty = parseFloat(document.getElementById('nsQty').value) || 0;
+            let unit = document.getElementById('nsUnit').value;
+            let price = parseFloat(document.getElementById('nsPrice').value) || 0;
+            if (!name) return alert("Item name is required!");
+            let totalVal = price * qty;
+
+            let tempId = Date.now();
+            localStock.push({
+                id: tempId,
+                name: name,
+                category: cat,
+                quantity: qty,
+                minStock: 10,
+                unit: unit,
+                price: price,
+                location: "Unassigned"
+            });
+            if (qty > 0) {
+                localDailyLedger.unshift({
+                    id: tempId,
+                    type: 'PURCHASE',
+                    item: name,
+                    qty: qty,
+                    amount: totalVal,
+                    timestamp: tempId,
+                    date: new Date().toLocaleString(),
+                    note: `Purchased ${name}`
+                });
+            }
+            saveStateToStorage();
+            closeModal('addStockModal');
+            renderUI();
+            showToast("Item Added!");
+            document.getElementById('nsName').value = '';
+            document.getElementById('nsCat').value = '';
+            document.getElementById('nsQty').value = '';
+            document.getElementById('nsPrice').value = '';
+
+            // Sync to backend
+            let formData = new FormData();
+            formData.append('merchant_id', MERCHANT_ID);
+            formData.append('item_id', String(tempId));
+            formData.append('item_name', name);
+            formData.append('quantity_change', qty);
+            formData.append('unit', unit);
+            formData.append('price', price);
+
+            fetch(`${RENDER_API_URL}/api/inventory/ADD_STOCK`, {
+                method: 'POST',
+                body: formData
+            }).catch(e => console.warn("Failed to sync new stock to backend:", e));
+        }
+
+        function initShopSathi() {
+            if (window.location.protocol === 'file:') {
+                document.getElementById('fileProtocolWarning').style.display = 'block';
+            }
+            syncDataFromCloud();
+            renderUI();
+            setTimeout(checkDueOrders, 1000);
+            
+            // Fetch initial stats and notifications
+            setTimeout(() => {
+                fetchDrawerStats();
+                fetchNotifications();
+            }, 500);
+            
+            // Setup periodic polling for notifications
+            setInterval(fetchNotifications, 60000); // Check every minute
+        }
+        
+        // ==========================================
+        // DRAWER & NOTIFICATIONS LOGIC
+        // ==========================================
+        function openMenuDrawer() {
+            document.getElementById('drawerOverlay').classList.add('active');
+            document.getElementById('menuDrawer').classList.add('active');
+            fetchDrawerStats();
+        }
+        
+        function closeMenuDrawer() {
+            document.getElementById('drawerOverlay').classList.remove('active');
+            document.getElementById('menuDrawer').classList.remove('active');
+        }
+        
+        function openNotificationCenter() {
+            document.getElementById('notifOverlay').classList.add('active');
+            document.getElementById('notifPanel').classList.add('active');
+            fetchNotifications();
+        }
+        
+        function closeNotificationCenter() {
+            document.getElementById('notifOverlay').classList.remove('active');
+            document.getElementById('notifPanel').classList.remove('active');
+        }
+        
+        async function fetchDrawerStats() {
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/stats/today_overview?merchant_id=${MERCHANT_ID}`);
+                if (!res.ok) return;
+                let json = await res.json();
+                if (json.status === 'success' && json.data) {
+                    document.getElementById('drawer-voice-cnt').innerText = json.data['Voice Entries'] || 0;
+                    document.getElementById('drawer-manual-cnt').innerText = json.data['Manual Entries'] || 0;
+                    document.getElementById('drawer-ocr-cnt').innerText = json.data['KhataSnap (OCR)'] || 0;
+                    document.getElementById('drawer-other-cnt').innerText = json.data['Other / Import'] || 0;
+                    document.getElementById('drawer-total-cnt').innerText = json.data['Total'] || 0;
+                }
+            } catch (e) {
+                console.error("Failed to fetch drawer stats", e);
+            }
+        }
+        
+        let allNotifications = [];
+        let currentNotifTab = 'All';
+        
+        async function fetchNotifications() {
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/notifications/?merchant_id=${MERCHANT_ID}`);
+                if (!res.ok) return;
+                let json = await res.json();
+                if (json.status === 'success' && json.data) {
+                    allNotifications = json.data;
+                    renderNotifications();
+                    updateBellCount();
+                }
+            } catch (e) {
+                console.error("Failed to fetch notifications", e);
+            }
+        }
+        
+        function updateBellCount() {
+            let unreadCount = allNotifications.filter(n => !n.is_read).length;
+            let bellEl = document.getElementById('bellCount');
+            if (unreadCount > 0) {
+                bellEl.style.display = 'flex';
+                bellEl.innerText = unreadCount > 9 ? '9+' : unreadCount;
+            } else {
+                bellEl.style.display = 'none';
+            }
+        }
+        
+        function switchNotifTab(tabName, el) {
+            document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            currentNotifTab = tabName;
+            renderNotifications();
+        }
+        
+        function formatNotifTime(dateStr) {
+            if (!dateStr) return '';
+            let d = new Date(dateStr + "Z"); // UTC to local
+            let now = new Date();
+            let diffMs = now - d;
+            let diffMins = Math.floor(diffMs / 60000);
+            
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            let diffHrs = Math.floor(diffMins / 60);
+            if (diffHrs < 24) return `${diffHrs}h ago`;
+            return d.toLocaleDateString();
+        }
+        
+        function getIconForNotifType(type) {
+            switch(type) {
+                case 'success': return '<i class="ti ti-check"></i>';
+                case 'alert': return '<i class="ti ti-alert-triangle"></i>';
+                case 'info': return '<i class="ti ti-info-circle"></i>';
+                default: return '<i class="ti ti-bell"></i>';
+            }
+        }
+        
+        function renderNotifications() {
+            let listEl = document.getElementById('notificationList');
+            
+            let filtered = allNotifications;
+            if (currentNotifTab !== 'All') {
+                filtered = allNotifications.filter(n => n.category === currentNotifTab);
+            }
+            
+            if (filtered.length === 0) {
+                listEl.innerHTML = `
+                    <div class="empty-state" style="margin-top:40px;">
+                        <i class="ti ti-bell-z"></i>
+                        <p>No notifications yet</p>
+                    </div>`;
+                return;
+            }
+            
+            let html = '';
+            filtered.forEach(n => {
+                html += `
+                    <div class="notif-item ${n.is_read ? '' : 'unread'}" onclick="handleNotifClick('${n.id}', '${n.category}', '${n.reference_type}')">
+                        <div class="notif-delete" onclick="deleteNotification(event, '${n.id}')"><i class="ti ti-x"></i></div>
+                        <div class="notif-content-row">
+                            <div class="notif-icon-wrap ${n.type}">
+                                ${getIconForNotifType(n.type)}
+                            </div>
+                            <div class="notif-body">
+                                <div class="notif-title">${n.title}</div>
+                                <div class="notif-desc">${n.message}</div>
+                                <span class="notif-time">${formatNotifTime(n.timestamp)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+        
+        async function handleNotifClick(notifId, category, refType) {
+            // Mark as read
+            let n = allNotifications.find(x => x.id === notifId);
+            if (n && !n.is_read) {
+                n.is_read = 1;
+                renderNotifications();
+                updateBellCount();
+                
+                fetch(`${RENDER_API_URL}/api/notifications/${notifId}/read?merchant_id=${MERCHANT_ID}`, {
+                    method: 'PUT'
+                }).catch(e => console.warn(e));
+            }
+            
+            // Navigate
+            closeNotificationCenter();
+            if (category === 'Sales') {
+                switchTab('tab-home', document.getElementById('nav-home'));
+                openSalesLedger();
+            } else if (category === 'Stock') {
+                switchTab('tab-stock', document.getElementById('nav-stock'));
+            } else if (category === 'Khata') {
+                switchTab('tab-khata', document.getElementById('nav-khata'));
+            } else if (category === 'System' || refType === 'BILL') {
+                switchTab('tab-home', document.getElementById('nav-home'));
+            }
+        }
+        
+        async function markAllNotificationsRead() {
+            allNotifications.forEach(n => n.is_read = 1);
+            renderNotifications();
+            updateBellCount();
+            showToast("All marked as read");
+            fetch(`${RENDER_API_URL}/api/notifications/read_all?merchant_id=${MERCHANT_ID}`, {
+                method: 'PUT'
+            }).catch(e => console.warn(e));
+        }
+        
+        async function clearAllNotifications() {
+            if(!confirm("Clear all notifications?")) return;
+            allNotifications = [];
+            renderNotifications();
+            updateBellCount();
+            fetch(`${RENDER_API_URL}/api/notifications/?merchant_id=${MERCHANT_ID}`, {
+                method: 'DELETE'
+            }).catch(e => console.warn(e));
+        }
+        
+        async function deleteNotification(e, id) {
+            e.stopPropagation();
+            allNotifications = allNotifications.filter(n => n.id !== id);
+            renderNotifications();
+            updateBellCount();
+            fetch(`${RENDER_API_URL}/api/notifications/${id}?merchant_id=${MERCHANT_ID}`, {
+                method: 'DELETE'
+            }).catch(e => console.warn(e));
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initShopSathi);
+        } else {
+            initShopSathi();
+        }
+    </script>
+</body>
+
+</html>
+
+</html>cript>
+</body>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
+
+</html>
 </html>

@@ -14,6 +14,7 @@ class SalesEdit(BaseModel):
     qty: float
     amount: float
     note: Optional[str] = ""
+    entry_source: Optional[str] = "Manual"
 
 @router.put("/{sale_id}")
 def update_sale(sale_id: str, payload: SalesEdit):
@@ -42,11 +43,23 @@ def update_sale(sale_id: str, payload: SalesEdit):
             
             cursor.execute("""
                 UPDATE daily_sales
-                SET item = ?, qty = ?, amount = ?, note = ?
+                SET item = ?, qty = ?, amount = ?, note = ?, entry_source = ?
                 WHERE sale_id = ? AND merchant_id = ?
-            """, (payload.item, payload.qty, payload.amount, payload.note, sale_id, payload.merchant_id))
+            """, (payload.item, payload.qty, payload.amount, payload.note, payload.entry_source, sale_id, payload.merchant_id))
             
             conn.commit()
+            
+            from app.routes.notifications import generate_notification
+            generate_notification(
+                merchant_id=payload.merchant_id,
+                title="Sale Updated",
+                message=f"Updated sale: {payload.item} for ₹{payload.amount}",
+                type="info",
+                category="Sales",
+                reference_id=sale_id,
+                reference_type="SALE"
+            )
+            
             return {"status": "success", "message": "Sale updated atomically"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -58,6 +71,7 @@ class SaleCreate(BaseModel):
     qty: float
     amount: float
     note: Optional[str] = ""
+    entry_source: Optional[str] = "Manual"
 
 @router.post("/")
 def create_sale(payload: SaleCreate):
@@ -66,10 +80,32 @@ def create_sale(payload: SaleCreate):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO daily_sales (sale_id, merchant_id, type, item, qty, amount, note)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (sale_id, payload.merchant_id, payload.type, payload.item, payload.qty, payload.amount, payload.note))
+                INSERT INTO daily_sales (sale_id, merchant_id, type, item, qty, amount, note, entry_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (sale_id, payload.merchant_id, payload.type, payload.item, payload.qty, payload.amount, payload.note, payload.entry_source))
             conn.commit()
+            
+            from app.routes.notifications import generate_notification
+            if payload.entry_source == "Voice":
+                title = "Voice Entry Added"
+                message = f"New voice entry of ₹{payload.amount} added to sale."
+            elif payload.entry_source == "KhataSnap":
+                title = "OCR Sale Added"
+                message = f"New OCR scanned sale of ₹{payload.amount} added."
+            else:
+                title = "New Sale Recorded"
+                message = f"₹{payload.amount} sale added successfully."
+                
+            generate_notification(
+                merchant_id=payload.merchant_id,
+                title=title,
+                message=message,
+                type="success",
+                category="Sales",
+                reference_id=sale_id,
+                reference_type="SALE"
+            )
+            
             return {"status": "success", "sale_id": sale_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

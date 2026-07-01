@@ -9,7 +9,8 @@ from app.routes import khata
 from app.routes import inventory
 from app.routes import snap  
 from app.routes import sales
-
+from app.routes import notifications
+from app.routes import stats
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ShopSathiCore")
 
@@ -28,6 +29,8 @@ app.include_router(khata.router, prefix="/api/khata", tags=["Khata Management"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Stock Management"])
 app.include_router(snap.router, prefix="/api/snap", tags=["Vision OCR"])
 app.include_router(sales.router, prefix="/api/sales", tags=["Daily Sales"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
+app.include_router(stats.router, prefix="/api/stats", tags=["Stats"])
 
 # Mount uploads directory for images
 import os
@@ -85,10 +88,21 @@ def materialize_tables():
                 qty REAL,
                 amount REAL NOT NULL,
                 note TEXT,
+                entry_source TEXT DEFAULT 'Manual',
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(merchant_id) REFERENCES merchants(merchant_id)
             );
         """)
+        
+        try:
+            cursor.execute("ALTER TABLE daily_sales ADD COLUMN entry_source TEXT DEFAULT 'Manual'")
+        except:
+            pass
+            
+        try:
+            cursor.execute("ALTER TABLE inventory ADD COLUMN entry_source TEXT DEFAULT 'Manual'")
+        except:
+            pass
         
         # This adds the missing transactions table schema to keep tracks historical ---
         cursor.execute("""
@@ -119,6 +133,22 @@ def materialize_tables():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(merchant_id) REFERENCES merchants(merchant_id),
                 FOREIGN KEY(party_id) REFERENCES parties(party_id)
+            );
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id TEXT PRIMARY KEY,
+                merchant_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                type TEXT NOT NULL,
+                category TEXT NOT NULL,
+                reference_id TEXT,
+                reference_type TEXT,
+                is_read INTEGER DEFAULT 0,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(merchant_id) REFERENCES merchants(merchant_id)
             );
         """)
         conn.commit()

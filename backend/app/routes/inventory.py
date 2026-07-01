@@ -11,6 +11,7 @@ class ItemCreate(BaseModel):
     item_name: str
     current_stock: float
     price: float
+    entry_source: Optional[str] = "Manual"
 
 class ItemUpdate(BaseModel):
     merchant_id: str
@@ -33,10 +34,22 @@ def create_item(item: ItemCreate):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO inventory (item_id, merchant_id, item_name, current_stock, price)
-                VALUES (?, ?, ?, ?, ?)
-            """, (item_id, item.merchant_id, item.item_name, item.current_stock, item.price))
+                INSERT INTO inventory (item_id, merchant_id, item_name, current_stock, price, entry_source)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (item_id, item.merchant_id, item.item_name, item.current_stock, item.price, item.entry_source))
             conn.commit()
+            
+            from app.routes.notifications import generate_notification
+            generate_notification(
+                merchant_id=item.merchant_id,
+                title="New Item Created",
+                message=f"Created {item.item_name} with {item.current_stock} stock.",
+                type="success",
+                category="Stock",
+                reference_id=item_id,
+                reference_type="INVENTORY"
+            )
+            
             return {"status": "success", "item_id": item_id, "message": "Item added to inventory!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -89,7 +102,8 @@ def process_stock_action(
     item_id: str = Form(...),
     item_name: str = Form(...),
     quantity_change: float = Form(0.0),
-    price: float = Form(0.0)
+    price: float = Form(0.0),
+    entry_source: str = Form("Manual")
 ):
     if action_type not in ["ADD_STOCK", "REMOVE_STOCK", "SET_STOCK"]:
         raise HTTPException(status_code=404, detail="Not found")
@@ -133,11 +147,56 @@ def process_stock_action(
                     new_stock = 0
                     
                 cursor.execute("""
-                    INSERT INTO inventory (item_id, merchant_id, item_name, current_stock, reorder_level, price)
-                    VALUES (?, ?, ?, ?, 10.0, ?)
-                """, (actual_item_id, merchant_id, item_name, new_stock, price))
+                    INSERT INTO inventory (item_id, merchant_id, item_name, current_stock, reorder_level, price, entry_source)
+                    VALUES (?, ?, ?, ?, 10.0, ?, ?)
+                """, (actual_item_id, merchant_id, item_name, new_stock, price, entry_source))
                 
             conn.commit()
+            
+            from app.routes.notifications import generate_notification
+            
+            if action_type == "ADD_STOCK" and quantity_change > 0:
+                generate_notification(
+                    merchant_id=merchant_id,
+                    title="Stock Increased",
+                    message=f"Added {quantity_change} to {item_name}.",
+                    type="success",
+                    category="Stock",
+                    reference_id=actual_item_id,
+                    reference_type="INVENTORY"
+                )
+            elif action_type == "REMOVE_STOCK" and quantity_change > 0:
+                generate_notification(
+                    merchant_id=merchant_id,
+                    title="Stock Reduced",
+                    message=f"Removed {quantity_change} from {item_name}.",
+                    type="info",
+                    category="Stock",
+                    reference_id=actual_item_id,
+                    reference_type="INVENTORY"
+                )
+                
+            if new_stock == 0:
+                generate_notification(
+                    merchant_id=merchant_id,
+                    title="Out of Stock",
+                    message=f"{item_name} is now out of stock!",
+                    type="alert",
+                    category="Stock",
+                    reference_id=actual_item_id,
+                    reference_type="INVENTORY"
+                )
+            elif new_stock <= 10.0: # Assuming default reorder_level is 10.0
+                generate_notification(
+                    merchant_id=merchant_id,
+                    title="Low Stock Alert",
+                    message=f"{item_name} is running low ({new_stock} remaining).",
+                    type="alert",
+                    category="Stock",
+                    reference_id=actual_item_id,
+                    reference_type="INVENTORY"
+                )
+                
             return {"status": "success", "item_id": actual_item_id}
             
     except Exception as e:
