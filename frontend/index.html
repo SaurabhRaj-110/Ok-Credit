@@ -2998,60 +2998,83 @@
             <div class="overlay-header">
                 <i class="ti ti-arrow-left" onclick="closeAddTxModal()"></i>
                 <div class="overlay-title">Add Stock Transaction</div>
-                <div style="display:flex; gap:12px;"><i class="ti ti-microphone" style="color:var(--primary);" onclick="openVoiceEntryModal('STOCK')"></i><i class="ti ti-history" style="color:var(--ink-main);"></i></div>
+                <div style="display:flex; gap:12px;"><i class="ti ti-microphone" style="color:var(--primary); font-size:22px; cursor:pointer;" onclick="openVoiceEntryModal('STOCK')"></i><i class="ti ti-history" style="color:var(--ink-main); font-size:22px; cursor:pointer;"></i></div>
             </div>
-            <div style="padding: 20px; overflow-y:auto; flex:1; -webkit-overflow-scrolling: touch;">
-                <div class="tx-tabs">
-                    <div class="tx-tab active sale" id="tabSale" onclick="switchAddTxTab('SALE')"><i class="ti ti-shopping-bag"></i> Sale</div>
-                    <div class="tx-tab" id="tabPurchase" onclick="switchAddTxTab('PURCHASE')"><i class="ti ti-shopping-cart"></i> Purchase</div>
-                </div>
-                <div style="font-size:12px; font-weight:700; color:var(--ink-main); margin-bottom:8px;">Item</div>
-                <div class="fake-input" id="atItemSelector" onclick="openSelectItemModal()" style="margin-bottom:8px;">
-                    <span id="atItemName">Search or select item</span>
-                    <div><i class="ti ti-chevron-right" style="font-size:18px; color:var(--ink-muted);"></i></div>
-                </div>
-
-                <div style="text-align:right; margin-bottom:16px;">
-                    <span style="color:var(--primary); font-size:12px; font-weight:700; cursor:pointer;" onclick="closeAddTxModal(); openModal('addStockModal');">+ Create New Item</span>
-                </div>
-
-                <div style="font-size:12px; font-weight:700; color:var(--ink-main); margin-bottom:8px;">Quantity</div>
-                <div style="display:flex; gap:12px; margin-bottom:16px; align-items:center;">
-                    <div class="qty-stepper" style="flex:1;">
-                        <button class="qs-btn" onclick="adjTxQty(-1)">-</button><input type="number" class="qs-val" id="atQty" value="1" oninput="calcTxTotal()"><button class="qs-btn" onclick="adjTxQty(1)">+</button>
+            <div style="overflow-y:auto; flex:1; -webkit-overflow-scrolling: touch;">
+                <!-- Sale / Purchase Tabs -->
+                <div style="padding: 16px 20px 0;">
+                    <div class="tx-tabs">
+                        <div class="tx-tab active sale" id="tabSale" onclick="switchAddTxTab('SALE')"><i class="ti ti-shopping-bag"></i> Sale</div>
+                        <div class="tx-tab" id="tabPurchase" onclick="switchAddTxTab('PURCHASE')"><i class="ti ti-shopping-cart"></i> Purchase</div>
                     </div>
-                    <select class="qs-unit" id="atUnitSelect" style="flex:1; border-radius:12px; border:1px solid var(--border); padding:0 12px;">
-                        <option value="Packets">Packets</option><option value="Kg">Kg</option><option value="Liters">Liters</option><option value="Pieces">Pieces</option>
+                </div>
+
+                <!-- Info Banner -->
+                <div style="margin:14px 20px 0; background:#f0fdf4; border:1px solid #d1fae5; border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:10px;" id="atAlert">
+                    <i class="ti ti-info-circle" style="color:var(--primary); font-size:18px; flex-shrink:0;"></i>
+                    <div style="font-size:12px; color:var(--primary); font-weight:500; line-height:1.5;" id="atAlertText">Add multiple items in one transaction. Stock will be reduced after saving the sale.</div>
+                </div>
+
+                <!-- Items Cart List -->
+                <div style="padding:0 20px; margin-top:18px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                        <div style="font-size:14px; font-weight:800; color:var(--ink-main);" id="atItemsTitle">Items in This Sale</div>
+                        <button style="background:none; border:none; color:#ef4444; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;" onclick="clearAllTxItems()"><i class="ti ti-trash"></i> Clear All</button>
+                    </div>
+                    <div id="atItemsList">
+                        <!-- Items rendered here by JS -->
+                    </div>
+                    <!-- Add Another Item Button -->
+                    <button id="atAddAnotherBtn" onclick="openSelectItemModalForCart()" style="width:100%; padding:14px; border:2px dashed var(--border); background:transparent; border-radius:14px; font-size:14px; font-weight:700; color:var(--ink-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:8px;"><i class="ti ti-plus" style="font-size:18px;"></i> Add Another Item</button>
+                </div>
+
+                <!-- Transaction Summary -->
+                <div style="margin:18px 20px 0; background:white; border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:var(--shadow-sm);">
+                    <div style="font-size:14px; font-weight:800; color:var(--primary); margin-bottom:14px;">Transaction Summary</div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <span style="font-size:13px; color:var(--ink-muted); font-weight:500;">Total Items</span>
+                        <span style="font-size:13px; font-weight:700; color:var(--ink-main);" id="atSummaryItems">0 items</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--border);">
+                        <span style="font-size:13px; color:var(--ink-muted); font-weight:500;">Total Quantity</span>
+                        <span style="font-size:13px; font-weight:700; color:var(--ink-main);" id="atSummaryQty">0 packets</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:14px; font-weight:700; color:var(--ink-main);">Total Amount (₹)</span>
+                        <span style="font-size:22px; font-weight:800; color:var(--primary);" id="atSummaryTotal">₹0.00</span>
+                    </div>
+                </div>
+
+                <!-- Link to Party -->
+                <div style="padding:18px 20px 0;">
+                    <div style="font-size:12px; font-weight:700; color:var(--ink-main); margin-bottom:8px;" id="atPartyLabel">Link to Customer Udhaar (Optional)</div>
+                    <select class="tx-form-input" id="atPartySelect" style="margin-bottom:0;">
+                        <option value="">-- No Party (Cash) --</option>
                     </select>
                 </div>
-                <div style="font-size:12px; font-weight:700; color:var(--ink-main); margin-bottom:8px;">Unit Price (₹)</div>
-                <input type="number" class="tx-form-input" id="atPrice" placeholder="0.00" oninput="calcTxTotal()" style="margin-bottom:16px;">
-                <div style="font-size:12px; font-weight:700; color:var(--ink-main); margin-bottom:8px;">Total Amount (₹)</div>
-                <input type="text" class="tx-form-input total" id="atTotal" value="0.00" readonly style="margin-bottom: 16px;">
 
-                <div style="font-size:12px; font-weight:700; color:var(--ink-main); margin-bottom:8px;" id="atPartyLabel">Link to Customer (Optional)</div>
-                <select class="tx-form-input" id="atPartySelect" style="margin-bottom:16px;">
-                    <option value="">-- No Party (Cash) --</option>
-                </select>
-                <div class="alert-card info" style="background:#f0fdf4; border:1px solid #d1fae5; pointer-events:none; margin-bottom:24px;" id="atAlert">
-                    <i class="ti ti-info-circle alert-icon" style="color:var(--primary); font-size:16px;"></i>
-                    <div class="alert-info">
-                        <div class="alert-title" style="color:var(--primary); font-size:11px; font-weight:600;" id="atAlertText">Stock will be updated automatically based on this transaction.</div>
-                    </div>
+                <!-- Info hint for party -->
+                <div style="margin:10px 20px 0; background:#f0fdf4; border:1px solid #d1fae5; border-radius:10px; padding:10px 14px; display:flex; align-items:center; gap:8px;">
+                    <i class="ti ti-info-circle" style="color:var(--primary); font-size:16px; flex-shrink:0;"></i>
+                    <div style="font-size:11px; color:var(--primary); font-weight:500;" id="atPartyHint">You can link this sale to a customer udhaar (optional).</div>
                 </div>
-                <div class="tx-voice-box" style="margin-top:0;">
+
+                <!-- Add by Voice Section -->
+                <div class="tx-voice-box" style="margin:18px 20px 0;">
                     <div style="font-weight:700; font-size:14px; color:var(--primary); margin-bottom:16px; text-align:left;">Add by Voice</div>
                     <div class="txv-mic" id="atMicBtn" onclick="openVoiceEntryModal('STOCK')"><i class="ti ti-microphone"></i></div>
-                    <div style="font-size:11px; color:var(--ink-muted);" id="atVoiceHint">Try: "5 packet Maggi becha 50 rupaye ka"</div>
+                    <div style="font-size:11px; color:var(--ink-muted);" id="atVoiceHint">Tap mic and say items to add in sale</div>
                 </div>
+                <div style="height:20px;"></div>
             </div>
             <div style="padding:16px 20px; border-top:1px solid var(--border); display:flex; gap:12px; background:white;">
                 <button style="flex:1; padding:14px; border:1px solid var(--border); background:white; border-radius:12px; font-weight:700; color:var(--ink-main); cursor:pointer;" onclick="closeAddTxModal()">Cancel</button>
-                <button style="flex:1.5; padding:14px; border:none; background:var(--primary); border-radius:12px; font-weight:700; color:white; cursor:pointer;" id="atSaveBtn" onclick="previewTransaction()">Review & Add</button>
+                <button style="flex:1.5; padding:14px; border:none; background:var(--primary); border-radius:12px; font-weight:700; color:white; cursor:pointer;" id="atSaveBtn" onclick="previewTransaction()">Review &amp; Add</button>
             </div>
         </div>
 
         <!-- SELECT ITEM OVERLAY -->
+
         <div class="full-overlay" id="selectItemOverlay" style="z-index: 9000 !important; background: var(--background);">
             <div class="overlay-header" style="background: white;">
                 <i class="ti ti-x" onclick="closeSelectItemModal()"></i>
@@ -5915,20 +5938,136 @@
         let currentAddTxMode = 'SALE';
         let currentAddTxItem = null;
 
+        // ==========================================
+        // 🛒 MULTI-ITEM CART TRANSACTION SYSTEM
+        // ==========================================
+        let txCartItems = []; // Array of { stockItem, qty, unit, unitPrice, amount }
+        let txCartMode = 'SALE'; // 'SALE' or 'PURCHASE'
+        let txCartSelectingIndex = -1; // -1 = adding new, >=0 = replacing that index
+
         function openAddTxModal() {
-            currentAddTxMode = 'SALE';
+            txCartItems = [];
+            txCartMode = 'SALE';
+            txCartSelectingIndex = -1;
             currentAddTxItem = null;
-            document.getElementById('atItemName').innerText = "Search or select item";
-            document.getElementById('atItemSelector').classList.remove('selected');
-            document.getElementById('atQty').value = 1;
-            document.getElementById('atPrice').value = "";
-            document.getElementById('atTotal').value = "0.00";
+            currentAddTxMode = 'SALE';
             switchAddTxTab('SALE');
+            renderTxCart();
             document.getElementById('addTxOverlay').style.display = 'flex';
         }
 
         function closeAddTxModal() {
             document.getElementById('addTxOverlay').style.display = 'none';
+        }
+
+        function switchAddTxTab(mode) {
+            currentAddTxMode = mode;
+            txCartMode = mode;
+            document.querySelectorAll('.tx-tab').forEach(t => t.classList.remove('active', 'sale', 'purchase'));
+            let tab = document.getElementById(mode === 'SALE' ? 'tabSale' : 'tabPurchase');
+            tab.classList.add('active');
+
+            let partySelect = document.getElementById('atPartySelect');
+            let optionsHtml = `<option value="">-- No Party (Cash) --</option>`;
+
+            if (mode === 'SALE') {
+                tab.classList.add('sale');
+                document.getElementById('atAlertText').innerText = "Add multiple items in one transaction. Stock will be reduced after saving the sale.";
+                document.getElementById('atSaveBtn').style.background = "var(--primary)";
+                document.getElementById('atVoiceHint').innerText = `Tap mic and say items to add in sale`;
+                document.getElementById('atPartyLabel').innerText = "Link to Customer Udhaar (Optional)";
+                document.getElementById('atPartyHint').innerText = "You can link this sale to a customer udhaar (optional).";
+                document.getElementById('atItemsTitle').innerText = "Items in This Sale";
+                document.getElementById('atSummaryTotal').style.color = "var(--primary)";
+                localKhata.forEach(c => { optionsHtml += `<option value="C-${c.id}">${c.name}</option>`; });
+            }
+            if (mode === 'PURCHASE') {
+                tab.classList.add('purchase');
+                document.getElementById('atAlertText').innerText = "Add multiple items in one transaction. Stock will be added after saving the purchase.";
+                document.getElementById('atSaveBtn').style.background = "var(--purple)";
+                document.getElementById('atVoiceHint').innerText = `Tap mic and say items to add in purchase`;
+                document.getElementById('atPartyLabel').innerText = "Link to Supplier Payment (Optional)";
+                document.getElementById('atPartyHint').innerText = "You can link this purchase to a supplier account (optional).";
+                document.getElementById('atItemsTitle').innerText = "Items in This Purchase";
+                document.getElementById('atSummaryTotal').style.color = "var(--purple)";
+                localSuppliers.forEach(s => { optionsHtml += `<option value="S-${s.id}">${s.name}</option>`; });
+            }
+            partySelect.innerHTML = optionsHtml;
+            renderTxCart();
+        }
+
+        function renderTxCart() {
+            let listEl = document.getElementById('atItemsList');
+            if (!listEl) return;
+            let isSale = txCartMode === 'SALE';
+            let accentColor = isSale ? 'var(--primary)' : 'var(--purple)';
+
+            if (txCartItems.length === 0) {
+                listEl.innerHTML = `<div onclick="openSelectItemModalForCart()" style="background:#f9fafb; border:1.5px dashed var(--border); border-radius:14px; padding:28px 20px; text-align:center; cursor:pointer; margin-bottom:4px;">
+                    <div style="font-size:32px; margin-bottom:8px;">🛒</div>
+                    <div style="font-size:14px; font-weight:700; color:var(--ink-main); margin-bottom:4px;">No items added yet</div>
+                    <div style="font-size:12px; color:var(--ink-muted);">Tap to search and add items</div>
+                </div>`;
+            } else {
+                listEl.innerHTML = txCartItems.map((item, idx) => {
+                    let emoji = getStockEmoji(item.stockItem ? item.stockItem.category : 'General');
+                    let stockInfo = item.stockItem ? `${item.stockItem.quantity} ${item.unit}` : '';
+                    return `<div style="background:white; border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:10px; display:flex; align-items:center; gap:10px;">
+                        <div style="width:44px; height:44px; background:#f0fdf4; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; border:1px solid #d1fae5;">${emoji}</div>
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:13px; font-weight:700; color:var(--ink-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.name}</div>
+                            <div style="font-size:11px; color:var(--ink-muted);">${stockInfo ? `1 ${item.unit}` : '1 Piece'}</div>
+                        </div>
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:2px; flex-shrink:0;">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <button onclick="adjustCartItemQty(${idx}, -1)" style="width:24px; height:24px; border-radius:50%; border:1.5px solid ${accentColor}; background:white; color:${accentColor}; font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">−</button>
+                                <span style="font-size:15px; font-weight:800; color:var(--ink-main); min-width:20px; text-align:center;">${item.qty}</span>
+                                <button onclick="adjustCartItemQty(${idx}, 1)" style="width:24px; height:24px; border-radius:50%; border:1.5px solid ${accentColor}; background:white; color:${accentColor}; font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">+</button>
+                            </div>
+                            <div style="font-size:10px; color:var(--ink-muted);">${item.unit}</div>
+                        </div>
+                        <div style="text-align:right; flex-shrink:0; min-width:60px;">
+                            <div style="font-size:13px; font-weight:700; color:var(--ink-main);">₹${item.unitPrice.toFixed(2)}</div>
+                            <div style="font-size:12px; font-weight:800; color:${accentColor};">₹${item.amount.toFixed(2)}</div>
+                        </div>
+                        <button onclick="removeCartItem(${idx})" style="width:32px; height:32px; border-radius:8px; border:1px solid #fee2e2; background:#fff5f5; color:#ef4444; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:15px;">🗑</button>
+                    </div>`;
+                }).join('');
+            }
+
+            // Update summary
+            let totalItems = txCartItems.length;
+            let totalQty = txCartItems.reduce((s, i) => s + i.qty, 0);
+            let totalAmt = txCartItems.reduce((s, i) => s + i.amount, 0);
+            let commonUnit = txCartItems.length > 0 ? txCartItems[0].unit : 'packets';
+            document.getElementById('atSummaryItems').innerText = `${totalItems} item${totalItems !== 1 ? 's' : ''}`;
+            document.getElementById('atSummaryQty').innerText = `${totalQty} ${commonUnit.toLowerCase()}`;
+            document.getElementById('atSummaryTotal').innerText = `₹${totalAmt.toFixed(2)}`;
+        }
+
+        function adjustCartItemQty(idx, diff) {
+            if (!txCartItems[idx]) return;
+            txCartItems[idx].qty = Math.max(1, txCartItems[idx].qty + diff);
+            txCartItems[idx].amount = txCartItems[idx].qty * txCartItems[idx].unitPrice;
+            renderTxCart();
+        }
+
+        function removeCartItem(idx) {
+            txCartItems.splice(idx, 1);
+            renderTxCart();
+        }
+
+        function clearAllTxItems() {
+            if (txCartItems.length === 0) return;
+            if (confirm(`Clear all ${txCartItems.length} items?`)) {
+                txCartItems = [];
+                renderTxCart();
+            }
+        }
+
+        function openSelectItemModalForCart() {
+            txCartSelectingIndex = -1; // adding new
+            openSelectItemModal();
         }
 
         let editingSaleId = null;
@@ -5990,15 +6129,8 @@
             try {
                 await fetch(`${RENDER_API_URL}/api/sales/${editingSaleId}`, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        merchant_id: MERCHANT_ID,
-                        item: item,
-                        qty: qty,
-                        amount: amt
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ merchant_id: MERCHANT_ID, item, qty, amount: amt })
                 });
                 showToast("Sale Updated");
                 await syncDataFromCloud();
@@ -6008,57 +6140,17 @@
             }
         }
 
-        function switchAddTxTab(mode) {
-            currentAddTxMode = mode;
-            document.querySelectorAll('.tx-tab').forEach(t => t.classList.remove('active', 'sale', 'purchase'));
-            let tab = document.getElementById(mode === 'SALE' ? 'tabSale' : 'tabPurchase');
-            tab.classList.add('active');
-
-            let partySelect = document.getElementById('atPartySelect');
-            let optionsHtml = `<option value="">-- No Party (Cash) --</option>`;
-
-            if (mode === 'SALE') {
-                tab.classList.add('sale');
-                document.getElementById('atAlertText').innerText = "Stock will be reduced automatically when you add a sale.";
-                document.getElementById('atAlert').style.display = 'flex';
-                document.getElementById('atSaveBtn').style.background = "var(--primary)";
-                document.getElementById('atVoiceHint').innerText = `Try: "5 packet Maggi becha 50 rupaye ka"`;
-                document.getElementById('atPartyLabel').innerText = "Link to Customer Udhaar (Optional)";
-                localKhata.forEach(c => {
-                    optionsHtml += `<option value="C-${c.id}">${c.name}</option>`;
-                });
-            }
-            if (mode === 'PURCHASE') {
-                tab.classList.add('purchase');
-                document.getElementById('atAlertText').innerText = "Stock will be added automatically when you record a purchase.";
-                document.getElementById('atAlert').style.display = 'flex';
-                document.getElementById('atSaveBtn').style.background = "var(--purple)";
-                document.getElementById('atVoiceHint').innerText = `Try: "Maggi ke 20 packet aaye 200 rupaye me"`;
-                document.getElementById('atPartyLabel').innerText = "Link to Supplier Payment (Optional)";
-                localSuppliers.forEach(s => {
-                    optionsHtml += `<option value="S-${s.id}">${s.name}</option>`;
-                });
-            }
-            partySelect.innerHTML = optionsHtml;
-        }
-
+        // Legacy single-item helpers kept for voice entry compatibility
         function adjTxQty(diff) {
-            let el = document.getElementById('atQty');
-            let val = parseInt(el.value) || 0;
-            val += diff;
-            if (val < 1) val = 1;
-            el.value = val;
-            calcTxTotal();
+            // Not used in new UI but kept for voice compatibility
         }
-
         function calcTxTotal() {
-            let qty = parseFloat(document.getElementById('atQty').value) || 0;
-            let price = parseFloat(document.getElementById('atPrice').value) || 0;
-            document.getElementById('atTotal').value = (qty * price).toFixed(2);
+            // Not used in new UI but kept for voice compatibility
         }
 
         function openSelectItemModal() {
             document.getElementById('selectItemOverlay').style.display = 'flex';
+            document.getElementById('siSearchInput').value = '';
             filterSelectItems();
         }
 
@@ -6077,35 +6169,54 @@
         }
 
         function selectItemForTx(index) {
-            currentAddTxItem = localStock[index];
-            document.getElementById('atItemName').innerText = currentAddTxItem.name;
-            document.getElementById('atItemSelector').classList.add('selected');
-            document.getElementById('atPrice').value = currentAddTxItem.price || 0;
-            calcTxTotal();
+            let item = localStock[index];
+            if (!item) return;
+            currentAddTxItem = item;
+
+            // Add to cart
+            let existing = txCartItems.findIndex(c => c.stockItem && c.stockItem.id === item.id);
+            if (existing > -1) {
+                // Increment qty if already in cart
+                txCartItems[existing].qty += 1;
+                txCartItems[existing].amount = txCartItems[existing].qty * txCartItems[existing].unitPrice;
+            } else {
+                txCartItems.push({
+                    stockItem: item,
+                    name: item.name,
+                    qty: 1,
+                    unit: item.unit || 'Packets',
+                    unitPrice: item.price || 0,
+                    amount: item.price || 0,
+                    category: item.category
+                });
+            }
+
             closeSelectItemModal();
+            renderTxCart();
         }
 
         // ==========================================
-        // 🔥 REVIEW & CONFIRM TRANSACTION FLOW (Manual)
+        // 🔥 REVIEW & CONFIRM TRANSACTION FLOW
         // ==========================================
         let pendingTxData = null;
 
         function previewTransaction() {
-            if (!currentAddTxItem && currentAddTxMode !== 'ADJUSTMENT') {
-                showToast("Please select an item first!");
+            if (txCartItems.length === 0) {
+                showToast("Please add at least one item!");
                 return;
             }
-            let qty = parseFloat(document.getElementById('atQty').value) || 1;
-            let price = parseFloat(document.getElementById('atPrice').value) || 0;
-            let total = qty * price;
-            let unit = document.getElementById('atUnitSelect').value;
+
+            // Check stock for sales
+            if (txCartMode === 'SALE') {
+                for (let ci of txCartItems) {
+                    if (ci.stockItem && ci.stockItem.quantity < ci.qty) {
+                        showToast(`Not enough stock for ${ci.name}! (${ci.stockItem.quantity} available)`);
+                        return;
+                    }
+                }
+            }
+
             let partyVal = document.getElementById('atPartySelect') ? document.getElementById('atPartySelect').value : "";
-
-            if (currentAddTxMode === 'SALE' && currentAddTxItem && currentAddTxItem.quantity < qty) {
-                showToast("Not enough stock for this sale!");
-                return;
-            }
-
             let partyObj = null;
             if (partyVal) {
                 let pType = partyVal.split('-')[0];
@@ -6113,20 +6224,29 @@
                 partyObj = pType === 'C' ? localKhata.find(c => c.id === pId) : localSuppliers.find(s => s.id === pId);
             }
 
+            // For multi-item, use first item data for review modal (show summary)
+            let firstItem = txCartItems[0];
+            let totalQty = txCartItems.reduce((s, i) => s + i.qty, 0);
+            let totalAmt = txCartItems.reduce((s, i) => s + i.amount, 0);
+            let itemNames = txCartItems.map(i => i.name).join(', ');
+            let firstOldStock = firstItem.stockItem ? firstItem.stockItem.quantity : 0;
+            let firstNewStock = firstItem.stockItem ? (txCartMode === 'SALE' ? firstItem.stockItem.quantity - firstItem.qty : firstItem.stockItem.quantity + firstItem.qty) : firstItem.qty;
+
             pendingTxData = {
-                type: currentAddTxMode,
-                itemObj: currentAddTxItem,
-                itemName: currentAddTxItem ? currentAddTxItem.name : "Custom Item",
-                category: currentAddTxItem ? currentAddTxItem.category : "General",
-                qty: qty,
-                unit: unit,
-                unitPrice: price,
-                total: total,
-                oldStock: currentAddTxItem ? currentAddTxItem.quantity : 0,
-                newStock: currentAddTxItem ? (currentAddTxMode === 'SALE' ? currentAddTxItem.quantity - qty : currentAddTxItem.quantity + qty) : qty,
-                notes: currentAddTxMode === 'SALE' ? "Sold" : "Restocked",
+                type: txCartMode,
+                itemObj: firstItem.stockItem,
+                itemName: txCartItems.length === 1 ? firstItem.name : `${txCartItems.length} items (${itemNames})`,
+                category: firstItem.category || 'General',
+                qty: totalQty,
+                unit: firstItem.unit,
+                unitPrice: txCartItems.length === 1 ? firstItem.unitPrice : 0,
+                total: totalAmt,
+                oldStock: firstOldStock,
+                newStock: firstNewStock,
+                notes: txCartMode === 'SALE' ? "Sold" : "Restocked",
                 source: "Manual",
-                partyObj: partyObj
+                partyObj: partyObj,
+                cartItems: txCartItems // pass full cart
             };
             showReviewConfirmModal(pendingTxData, false);
         }
@@ -6138,7 +6258,7 @@
             document.getElementById('rcItemImg').innerText = getStockEmoji(data.category);
             document.getElementById('rcItemName').innerText = data.itemName;
             document.getElementById('rcQty').innerText = `${data.qty} ${data.unit}`;
-            document.getElementById('rcUnitPrice').innerText = `₹${data.unitPrice}`;
+            document.getElementById('rcUnitPrice').innerText = data.unitPrice > 0 ? `₹${data.unitPrice}` : `₹${data.total} (total)`;
             document.getElementById('rcTotalAmount').innerText = `₹${data.total}`;
             let color = data.type === 'SALE' ? 'var(--red)' : 'var(--primary)';
             document.getElementById('rcOldStock').innerText = data.oldStock;
@@ -6156,16 +6276,53 @@
             if (!pendingTxData) return;
             let d = pendingTxData;
 
-            let success = await TransactionEngine.processStockTransaction(d);
+            // Multi-item: process each cart item individually, or single item
+            let itemsToProcess = d.cartItems && d.cartItems.length > 0 ? d.cartItems : [{ stockItem: d.itemObj, name: d.itemName, qty: d.qty, unit: d.unit, unitPrice: d.unitPrice, amount: d.total, category: d.category }];
 
-            if (success) {
+            let allSuccess = true;
+            let successCount = 0;
+
+            for (let cartItem of itemsToProcess) {
+                let itemData = {
+                    type: d.type,
+                    itemObj: cartItem.stockItem,
+                    itemName: cartItem.name,
+                    category: cartItem.category || 'General',
+                    qty: cartItem.qty,
+                    unit: cartItem.unit,
+                    unitPrice: cartItem.unitPrice,
+                    total: cartItem.amount,
+                    oldStock: cartItem.stockItem ? cartItem.stockItem.quantity : 0,
+                    newStock: cartItem.stockItem ? (d.type === 'SALE' ? cartItem.stockItem.quantity - cartItem.qty : cartItem.stockItem.quantity + cartItem.qty) : cartItem.qty,
+                    notes: d.type === 'SALE' ? "Sold" : "Restocked",
+                    source: d.source,
+                    partyObj: d.partyObj
+                };
+                let success = await TransactionEngine.processStockTransaction(itemData);
+                if (success) successCount++;
+                else allSuccess = false;
+            }
+
+            if (successCount > 0) {
                 renderUI();
-                document.getElementById('tsItemImg').innerText = getStockEmoji(d.category);
-                document.getElementById('tsItemName').innerText = d.itemName;
+                // Show success with summary of all items
+                let firstItem = itemsToProcess[0];
+                let lastData = {
+                    type: d.type,
+                    itemObj: firstItem.stockItem,
+                    itemName: itemsToProcess.length > 1 ? `${itemsToProcess.length} items saved` : firstItem.name,
+                    category: firstItem.category || 'General',
+                    qty: itemsToProcess.reduce((s, i) => s + i.qty, 0),
+                    unit: firstItem.unit,
+                    total: itemsToProcess.reduce((s, i) => s + i.amount, 0),
+                    newStock: firstItem.stockItem ? (d.type === 'SALE' ? firstItem.stockItem.quantity - firstItem.qty : firstItem.stockItem.quantity + firstItem.qty) : firstItem.qty
+                };
+                document.getElementById('tsItemImg').innerText = getStockEmoji(lastData.category);
+                document.getElementById('tsItemName').innerText = lastData.itemName;
                 document.getElementById('tsTimeSub').innerText = `${d.type==='SALE'?'Sale':d.type==='PURCHASE'?'Purchase':'Adj'} • ${formatTime(Date.now())}`;
-                document.getElementById('tsQty').innerText = `${d.qty} ${d.unit}`;
-                document.getElementById('tsTotal').innerText = `₹${d.total}`;
-                document.getElementById('tsNewStock').innerText = `${d.newStock} ${d.unit}`;
+                document.getElementById('tsQty').innerText = `${lastData.qty} ${lastData.unit}`;
+                document.getElementById('tsTotal').innerText = `₹${lastData.total}`;
+                document.getElementById('tsNewStock').innerText = `${lastData.newStock} ${lastData.unit}`;
                 document.getElementById('reviewConfirmOverlay').style.display = 'none';
                 document.getElementById('addTxOverlay').style.display = 'none';
                 closeVoiceEntryModal();
