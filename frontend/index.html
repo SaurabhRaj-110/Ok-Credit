@@ -3679,7 +3679,7 @@
             <div class="top-bg-gradient">
                 <div class="app-header">
                     <div class="header-left">
-                        <div class="menu-btn" onclick="showToast('Menu opened')"><i class="ti ti-menu-2"></i></div>
+                        <div class="menu-btn" onclick="openMenuDrawer()"><i class="ti ti-menu-2"></i></div>
                         <div class="shop-info">
                             <div class="shop-greeting">Namaskar, Sanjay Ji </div>
                             <div class="shop-name">Sanjay Kirana Store <i class="ti ti-discount-check-filled" style="color:#d1fae5; font-size:14px;"></i></div>
@@ -7868,7 +7868,7 @@
             syncDataFromCloud();
             renderUI();
             setTimeout(checkDueOrders, 1000);
-        }
+            
             // Fetch initial stats and notifications
             setTimeout(() => {
                 fetchDrawerStats();
