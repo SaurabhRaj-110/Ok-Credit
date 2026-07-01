@@ -74,14 +74,19 @@ async def process_notebook_image(merchant_id: str = Form(...), file: UploadFile 
     try:
         image_bytes = await file.read()
         
-        import tempfile
-        filename = f"{uuid.uuid4().hex}_{file.filename}"
-        filepath = os.path.join(tempfile.gettempdir(), filename)
+        # Save to uploads/ directory so images are accessible via URL
+        uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+        filename = f"bill_{uuid.uuid4().hex[:12]}_{file.filename or 'receipt.jpg'}"
+        filepath = os.path.join(uploads_dir, filename)
         with open(filepath, "wb") as f:
             f.write(image_bytes)
+        # Store as relative URL path
+        image_url_path = f"/uploads/{filename}"
             
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
         image_url = f"data:{file.content_type};base64,{base64_image}"
+
 
         system_instruction = """
 You are a highly accurate OCR system specialized in reading Indian Kirana (grocery) store bills, handwritten ledger pages, and printed invoices.
@@ -216,7 +221,7 @@ CRITICAL RULES:
             else:
                 raise HTTPException(status_code=500, detail="Could not process the image via Gemini Vision. Please try again.")
                 
-        extracted_data['image_path'] = filepath
+        extracted_data['image_path'] = image_url_path
         
         if not extracted_data.get('is_valid_bill', True): # Default to True if missing
             return {"status": "SUCCESS", "data": extracted_data}
@@ -332,6 +337,7 @@ async def confirm_snap_entries(payload: ConfirmPayload):
             )
 
             # 2. Track Khata Updates
+            # Handle explicit credit/repayment actions
             if "CREDIT" in entry.action or "REPAYMENT" in entry.action:
                 p_type = "SUPPLIER" if "SUPPLIER" in entry.action else "CUSTOMER"
                 p_name_target = entry.target_name if entry.target_name else (payload.party_name or "General")
@@ -344,15 +350,30 @@ async def confirm_snap_entries(payload: ConfirmPayload):
                         'txn_type': "GIVEN" if (entry.action == "CUSTOMER_CREDIT" or entry.action == "SUPPLIER_PAYMENT") else "GOT"
                     }
                 party_khata_updates[p_id]['amount'] += amt
+            # Handle ADD_STOCK (supplier purchase) and REDUCE_STOCK (customer sale) by bill_type
+            elif entry.action in ["ADD_STOCK", "REDUCE_STOCK"]:
+                if party_id and payload.party_name:
+                    is_supplier_purchase = payload.bill_type == "SUPPLIER" and entry.action == "ADD_STOCK"
+                    is_customer_sale = payload.bill_type == "CUSTOMER" and entry.action == "REDUCE_STOCK"
+                    
+                    if is_supplier_purchase or is_customer_sale:
+                        if party_id not in party_khata_updates:
+                            party_khata_updates[party_id] = {
+                                'amount': 0.0,
+                                'is_credit': True,  # Balance increases (we owe supplier / customer owes us)
+                                'txn_type': "GIVEN" if is_customer_sale else "GOT"
+                            }
+                        party_khata_updates[party_id]['amount'] += amt
 
         # 3. Apply consolidated Khata Updates
         for p_id, p_data in party_khata_updates.items():
             if p_data['amount'] > 0:
                 balance_change = p_data['amount'] if p_data['is_credit'] else -p_data['amount']
                 txn_id = f"txn_{uuid.uuid4().hex[:6]}"
+                txn_type = "GIVEN" if payload.bill_type == "CUSTOMER" else "GOT"
                 cursor.execute(
                     "INSERT INTO transactions (transaction_id, party_id, merchant_id, amount, txn_type, entry_source, voice_transcript, image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (txn_id, p_id, payload.merchant_id, p_data['amount'], p_data['txn_type'], "LLAMA_OCR", f"Bill ID: {bill_id}", payload.image_path)
+                    (txn_id, p_id, payload.merchant_id, p_data['amount'], txn_type, "KhataSnap", f"Bill ID: {bill_id}", payload.image_path)
                 )
                 cursor.execute(
                     "UPDATE parties SET total_balance = total_balance + ? WHERE party_id = ?",
@@ -366,4 +387,4 @@ async def confirm_snap_entries(payload: ConfirmPayload):
         logger.error(f"KhataSnap DB Error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to save bill entries.")
     finally:
-        conn.close()
+        conn.close()

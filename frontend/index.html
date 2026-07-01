@@ -3711,7 +3711,10 @@
                     <div class="feat-item"><i class="ti ti-wand"></i> Aapka AI Bill padh lega</div>
                     <div class="feat-item"><i class="ti ti-wand"></i> Khata mein update ho jayega</div>
                     <div class="feat-item"><i class="ti ti-users"></i> Customer, Stock & Supplier Updated</div>
-                    <button class="primary-btn" style="margin-top:16px;" onclick="document.getElementById('cameraInputReal').click()"><i class="ti ti-camera" style="font-size:20px;"></i> Photo Upload Karein</button>
+                    <div style="display:flex; gap:10px; margin-top:16px;">
+                        <button class="primary-btn" style="flex:1; margin-top:0;" onclick="document.getElementById('cameraInputReal').click()"><i class="ti ti-camera" style="font-size:18px;"></i> Camera</button>
+                        <button style="flex:1; padding:14px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; border:2px solid var(--primary); background:white; color:var(--primary); display:flex; align-items:center; justify-content:center; gap:8px;" onclick="document.getElementById('galleryInputReal').click()"><i class="ti ti-photo" style="font-size:18px;"></i> Gallery</button>
+                    </div>
                     <div style="text-align:center; font-size:12px; font-weight:700; color:var(--primary); margin-top:8px; cursor:pointer; font-family: var(--font-family);">How it works? <i class="ti ti-play-circle"></i></div>
                 </div>
             </div>
@@ -5872,7 +5875,8 @@
                         let calculatedNewStock = isSale ? 10 : (isPurchase ? (15 + safeQty) : 0);
 
                         let impactStr = isSale || isPurchase ? `<i class="ti ti-box" style="color:#d97706; font-size:16px;"></i> <span style="color:var(--ink-muted); white-space:nowrap;">Stock Impact:</span> <span style="color:var(--primary); white-space:nowrap;">${calculatedOldStock} &rarr; ${calculatedNewStock}</span> <span style="color:var(--ink-main); white-space:nowrap;">${tx.unit||'Items'}</span>` : `<i class="ti ti-receipt" style="color:var(--purple); font-size:16px;"></i> <span style="color:var(--ink-muted);">Linked Sale:</span> Khata Updated`;
-                        let evidenceHtml = tx.evidence ? `<div style="margin-top: 10px; width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);"><img src="${RENDER_API_URL}${tx.evidence}" style="width:100%; height:120px; object-fit:cover; display:block;" alt="Receipt Note"></div>` : '';
+                        let evidenceUrl = tx.evidence ? (tx.evidence.startsWith('http') ? tx.evidence : (tx.evidence.startsWith('/uploads/') ? RENDER_API_URL + tx.evidence : RENDER_API_URL + '/uploads/' + tx.evidence.split('/').pop())) : null;
+                        let evidenceHtml = evidenceUrl ? `<div style="margin-top: 10px; width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);"><a href="${evidenceUrl}" target="_blank" rel="noopener"><img src="${evidenceUrl}" style="width:100%; height:120px; object-fit:cover; display:block;" alt="Receipt Bill" onerror="this.parentElement.parentElement.style.display='none'"></a></div>` : '';
                         html += `
                         <div class="tl-item">
                             <div class="tl-icon" style="background:${badgeColor};"><i class="ti ${iconClass}"></i></div>
@@ -6587,21 +6591,43 @@
         }
 
         function editSnapPartyName() {
-            let newName = prompt("Edit Party Name (will be updated for this bill):", bsParty ? bsParty.name : "General Sale");
-            if (newName !== null && newName.trim() !== "") {
-                if (!bsParty || bsParty.id === 'temp') {
-                    bsParty = {
-                        id: 'temp',
-                        name: newName.trim(),
-                        phone: '',
-                        balance: 0,
-                        type: bsContext === 'PURCHASE' ? 'supplier' : 'customer'
-                    };
-                } else {
-                    bsParty.name = newName.trim();
-                }
-                openBillReviewStep(); // re-render
+            // Show inline edit modal for name and phone
+            let currentName = bsParty ? bsParty.name : '';
+            let currentPhone = bsParty ? (bsParty.phone || '') : '';
+            let isSup = bsContext === 'PURCHASE';
+            let existingModal = document.getElementById('snapPartyEditModal');
+            if (existingModal) existingModal.remove();
+            let modal = document.createElement('div');
+            modal.id = 'snapPartyEditModal';
+            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:flex-end;justify-content:center;';
+            modal.innerHTML = `
+              <div style="background:white;border-radius:20px 20px 0 0;padding:24px 20px 32px;width:100%;max-width:480px;">
+                <div style="font-size:16px;font-weight:700;color:var(--ink-main);margin-bottom:16px;">Edit ${isSup ? 'Supplier' : 'Customer'} Details</div>
+                <label style="font-size:12px;color:var(--ink-muted);font-weight:600;">Name</label>
+                <input id="snapEditName" type="text" value="${currentName}" placeholder="Enter name" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;margin:6px 0 14px;outline:none;">
+                <label style="font-size:12px;color:var(--ink-muted);font-weight:600;">Phone Number (optional)</label>
+                <input id="snapEditPhone" type="tel" value="${currentPhone}" placeholder="10 digit mobile number" maxlength="10" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;margin:6px 0 20px;outline:none;">
+                <div style="display:flex;gap:10px;">
+                  <button onclick="document.getElementById('snapPartyEditModal').remove()" style="flex:1;padding:14px;border:1.5px solid var(--border);background:white;border-radius:12px;font-weight:700;cursor:pointer;font-size:14px;">Cancel</button>
+                  <button onclick="applySnapPartyEdit()" style="flex:1.5;padding:14px;border:none;background:${isSup ? 'var(--purple)' : 'var(--primary)'};color:white;border-radius:12px;font-weight:700;cursor:pointer;font-size:14px;">Save</button>
+                </div>
+              </div>`;
+            document.body.appendChild(modal);
+            setTimeout(() => document.getElementById('snapEditName').focus(), 100);
+        }
+
+        function applySnapPartyEdit() {
+            let newName = (document.getElementById('snapEditName').value || '').trim();
+            let newPhone = (document.getElementById('snapEditPhone').value || '').trim().replace(/\D/g, '');
+            document.getElementById('snapPartyEditModal').remove();
+            if (!newName) { showToast('Name cannot be empty'); return; }
+            if (!bsParty || bsParty.id === 'temp') {
+                bsParty = { id: 'temp', name: newName, phone: newPhone, balance: 0, type: bsContext === 'PURCHASE' ? 'supplier' : 'customer' };
+            } else {
+                bsParty.name = newName;
+                bsParty.phone = newPhone;
             }
+            openBillReviewStep();
         }
 
         function openBillReviewStep() {
@@ -6701,8 +6727,16 @@
             if (result.success) {
                 if (bsParty) {
                     let targetArr = isSale ? localKhata : localSuppliers;
+                    // Try find by ID first, then fall back to name match (for temp parties that got a real ID after sync)
                     let pIdx = targetArr.findIndex(p => p.id === bsParty.id);
-                    if (pIdx > -1) bsParty = targetArr[pIdx];
+                    if (pIdx === -1 && bsParty.name) {
+                        pIdx = targetArr.findIndex(p => p.name && p.name.toLowerCase() === bsParty.name.toLowerCase());
+                    }
+                    if (pIdx > -1) {
+                        bsParty = targetArr[pIdx];
+                    }
+                    // Set the currentLedgerType correctly based on context
+                    currentLedgerType = isSale ? 'customer' : 'supplier';
                 }
 
                 saveStateToStorage();
@@ -6747,11 +6781,32 @@
         }
 
         function finishBillSnapToLedger() {
-            document.getElementById('billSuccessOverlay').style.display = 'none';
-            if (!bsParty) {
+            closeBillSnapFlow();
+            if (bsParty) {
+                // Open the correct ledger (supplier or customer)
+                let ledgerType = bsContext === 'PURCHASE' ? 'supplier' : 'customer';
+                let targetArr = ledgerType === 'supplier' ? localSuppliers : localKhata;
+                // Find the party by ID or name
+                let found = targetArr.find(p => p.id === bsParty.id);
+                if (!found && bsParty.name) {
+                    found = targetArr.find(p => p.name && p.name.toLowerCase() === bsParty.name.toLowerCase());
+                }
+                if (found) {
+                    openLedger(found.id, ledgerType);
+                    document.getElementById('ledgerOverlay').style.display = 'flex';
+                } else {
+                    // Switch to the right tab
+                    if (ledgerType === 'supplier') {
+                        switchTab('tab-khata', document.getElementById('nav-khata'));
+                    } else {
+                        switchTab('tab-khata', document.getElementById('nav-khata'));
+                    }
+                }
+            } else {
                 switchTab('tab-stock', document.getElementById('nav-stock'));
             }
         }
+
 
         function restartBillSnapFlow() {
             document.getElementById('billSuccessOverlay').style.display = 'none';
@@ -7011,7 +7066,8 @@
                 let amtStr = tx.amount ? `${sign}₹${tx.amount}` : '';
                 let subText = tx.type === 'order' && tx.dueDate ? `Due: ${formatDate(tx.dueDate)}` : (tx.note || '');
 
-                let receiptHtml = tx.image_path ? `<div style="margin-top: 10px; width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);"><a href="${RENDER_API_URL}/${tx.image_path}" target="_blank"><img src="${RENDER_API_URL}/${tx.image_path}" style="width:100%; height:120px; object-fit:cover; display:block;" alt="Receipt Note"></a></div>` : (tx.hasReceipt ? `<div style="margin-top: 10px; width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);"><img src="https://images.unsplash.com/photo-1620063236056-fcf900cb3fb5?auto=format&fit=crop&q=80&w=400&h=150" style="width:100%; height:120px; object-fit:cover; display:block;" alt="Receipt Note"></div>` : '');
+                let receiptUrl = tx.image_path ? (tx.image_path.startsWith('http') ? tx.image_path : (tx.image_path.startsWith('/uploads/') ? RENDER_API_URL + tx.image_path : RENDER_API_URL + '/uploads/' + tx.image_path.split('/').pop())) : null;
+                let receiptHtml = receiptUrl ? `<div style="margin-top: 10px; width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);"><a href="${receiptUrl}" target="_blank" rel="noopener"><img src="${receiptUrl}" style="width:100%; height:120px; object-fit:cover; display:block;" alt="Receipt Bill" onerror="this.parentElement.parentElement.style.display='none'"></a></div>` : (tx.hasReceipt ? `<div style="margin-top: 10px; width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);"><img src="https://images.unsplash.com/photo-1620063236056-fcf900cb3fb5?auto=format&fit=crop&q=80&w=400&h=150" style="width:100%; height:120px; object-fit:cover; display:block;" alt="Receipt Note"></div>` : '');
 
                 txHtml += `<div class="tx-row" style="flex-direction:column; align-items:flex-start;">
                             <div class="tx-top">
