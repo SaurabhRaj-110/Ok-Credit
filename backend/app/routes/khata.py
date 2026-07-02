@@ -137,6 +137,7 @@ def delete_party(party_id: str, merchant_id: str):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM transactions WHERE party_id = ? AND merchant_id = ?", (party_id, merchant_id))
+            cursor.execute("DELETE FROM evidence WHERE party_id = ? AND merchant_id = ?", (party_id, merchant_id))
             cursor.execute("DELETE FROM parties WHERE party_id = ? AND merchant_id = ?", (party_id, merchant_id))
             conn.commit()
             return {"status": "success", "message": "Account completely deleted"}

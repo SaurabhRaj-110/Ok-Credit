@@ -2573,8 +2573,8 @@
             color: var(--primary);
             white-space: nowrap;
         }
-        
         /* ================= EVIDENCE GALLERY UI ================= */
+        
         .evidence-tabs {
             display: flex;
             gap: 10px;
@@ -2582,6 +2582,7 @@
             background: white;
             border-bottom: 1px solid var(--border);
         }
+        
         .evd-tab {
             padding: 8px 16px;
             font-size: 14px;
@@ -2590,6 +2591,7 @@
             border-bottom: 2px solid transparent;
             cursor: pointer;
         }
+        
         .evd-tab.active {
             color: var(--primary);
             border-bottom: 2px solid var(--primary);
@@ -2601,6 +2603,7 @@
             gap: 12px;
             padding: 16px 20px;
         }
+        
         .evd-card {
             background: white;
             border: 1px solid var(--border);
@@ -2609,20 +2612,24 @@
             display: flex;
             flex-direction: column;
         }
+        
         .evd-thumb {
             width: 100%;
             height: 120px;
             object-fit: cover;
             cursor: pointer;
         }
+        
         .evd-info {
             padding: 8px;
             font-size: 12px;
         }
+        
         .evd-date {
             color: var(--ink-muted);
             font-size: 10px;
         }
+        
         .evd-tag {
             color: var(--primary);
             font-weight: 600;
@@ -2631,16 +2638,20 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        
         /* Full Screen Viewer */
+        
         .viewer-overlay {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.95);
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
             z-index: 10000;
             display: none;
             flex-direction: column;
         }
+        
         .viewer-header {
             display: flex;
             justify-content: space-between;
@@ -2648,10 +2659,12 @@
             padding: 16px;
             color: white;
         }
+        
         .viewer-header i {
             font-size: 24px;
             cursor: pointer;
         }
+        
         .viewer-body {
             flex: 1;
             display: flex;
@@ -2660,19 +2673,22 @@
             overflow: hidden;
             position: relative;
         }
+        
         .viewer-img {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
             transition: transform 0.3s ease;
         }
+        
         .viewer-footer {
             display: flex;
             justify-content: space-around;
             padding: 20px;
             color: white;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.8);
         }
+        
         .viewer-btn {
             display: flex;
             flex-direction: column;
@@ -2681,10 +2697,10 @@
             font-size: 12px;
             cursor: pointer;
         }
+        
         .viewer-btn i {
             font-size: 20px;
         }
-
         /* ================= KHATASNAP MAIN TAB UI ================= */
         
         .snap-hero {
@@ -3690,7 +3706,7 @@
                 <div class="tx-header" style="padding-top:16px;">Recent Transactions <span>View All <i class="ti ti-chevron-right" style="font-size:10px;"></i></span></div>
                 <div id="ledgerTxList"></div>
             </div>
-            
+
             <div id="ledgerEvdSection" style="display:none; background:var(--background); min-height: 300px;">
                 <div style="padding: 16px 20px; display:flex; gap:10px;">
                     <button class="primary-btn" style="flex:1; margin:0;" onclick="document.getElementById('evdCameraInput').click()"><i class="ti ti-camera"></i> Add Photo</button>
@@ -4489,34 +4505,8 @@
         let localStock = [];
         let localNotifications = [];
         let localDailyLedger = [];
-        try {
-            localKhata = JSON.parse(SafeStorage.get('ss_khata')) || [];
-        } catch (e) {
-            localKhata = [];
-        }
-        try {
-            localSuppliers = JSON.parse(SafeStorage.get('ss_suppliers')) || [];
-        } catch (e) {
-            localSuppliers = [];
-        }
-        try {
-            localStock = JSON.parse(SafeStorage.get('ss_stock')) || [];
-        } catch (e) {
-            localStock = [];
-        }
-        try {
-            localNotifications = JSON.parse(SafeStorage.get('ss_notifications')) || [];
-        } catch (e) {
-            localNotifications = [];
-        }
-        try {
-            localDailyLedger = JSON.parse(SafeStorage.get('ss_daily_ledger')) || [];
-        } catch (e) {
-            localDailyLedger = [];
-        }
-
-        let unreadCount = parseInt(SafeStorage.get('ss_unread')) || 0;
-        let todaySales = parseInt(SafeStorage.get('ss_sales')) || 9200;
+        let unreadCount = 0;
+        let todaySales = 0;
         let currentStockFilter = 'all';
         let currentSalesFilter = 'ALL';
 
@@ -4606,6 +4596,7 @@
                     });
                     if (!res.ok) throw new Error("Sync Failed");
 
+                    await syncDataFromCloud();
                     showToast("Entry Saved!");
                     return true;
                 } catch (e) {
@@ -4727,6 +4718,7 @@
                     }
 
                     await Promise.all(promises);
+                    await syncDataFromCloud();
                     return true;
                 } catch (e) {
                     console.error("Stock Tx Failed", e);
@@ -4813,6 +4805,8 @@
                             }
                         }
                     }
+                    saveStateToStorage();
+                    await syncDataFromCloud();
                     showToast(`✅ Successfully saved ${actions.length} actions!`);
                     return true;
                 } catch (e) {
@@ -4892,126 +4886,7 @@
             }
         };
 
-        if (localStock.length === 0) {
-            localStock = [{
-                id: 1,
-                name: "Maggi (70g)",
-                category: "Snacks",
-                quantity: 15,
-                minStock: 30,
-                unit: "Packets",
-                price: 15
-            }, {
-                id: 2,
-                name: "Parle-G Biscuit",
-                category: "Snacks",
-                quantity: 28,
-                minStock: 10,
-                unit: "Packets",
-                price: 13
-            }, {
-                id: 3,
-                name: "Amul Milk (500ml)",
-                category: "Dairy",
-                quantity: 12,
-                minStock: 20,
-                unit: "Pouches",
-                price: 28
-            }, {
-                id: 4,
-                name: "Sugar (1kg)",
-                category: "Grocery",
-                quantity: 5,
-                minStock: 10,
-                unit: "Kg",
-                price: 21
-            }, {
-                id: 5,
-                name: "Sunflower Oil (1L)",
-                category: "Grocery",
-                quantity: 0,
-                minStock: 5,
-                unit: "Bottles",
-                price: 110
-            }, {
-                id: 6,
-                name: "Aashirvaad Atta (1kg)",
-                category: "Grocery",
-                quantity: 42,
-                minStock: 20,
-                unit: "Kg",
-                price: 280
-            }];
-            todaySales = 6200;
-            localDailyLedger = [{
-                id: 1,
-                type: 'SALE',
-                item: "Maggi (70g)",
-                qty: 5,
-                unit: "packets",
-                unitPrice: 10,
-                amount: 50,
-                timestamp: Date.now() - 3600000,
-                date: new Date().toLocaleString(),
-                note: `Sale`
-            }, {
-                id: 2,
-                type: 'PURCHASE',
-                item: "Maggi (70g)",
-                qty: 20,
-                unit: "packets",
-                unitPrice: 10,
-                amount: 200,
-                timestamp: Date.now() - 7200000,
-                date: new Date().toLocaleString(),
-                note: `Purchase`
-            }];
-        }
-        if (localKhata.length === 0) {
-            localKhata = [{
-                id: 1,
-                name: "Suresh Kumar",
-                phone: "9876543210",
-                balance: 6060,
-                days: 35,
-                transactions: [{
-                    id: 1,
-                    type: 'udhaar',
-                    amount: 5060,
-                    date: getTodayStr(),
-                    note: 'Opening Balance'
-                }]
-            }, {
-                id: 2,
-                name: "Saurabh Raj",
-                phone: "9142150520",
-                balance: 2340,
-                days: 10,
-                transactions: [{
-                    id: 2,
-                    type: 'udhaar',
-                    amount: 2340,
-                    date: getTodayStr(),
-                    note: 'Old Balance'
-                }]
-            }];
-        }
-        if (localSuppliers.length === 0) {
-            localSuppliers = [{
-                id: 1,
-                name: "ITC Distributor",
-                phone: "9988776655",
-                balance: 15500,
-                days: 5,
-                transactions: [{
-                    id: 1,
-                    type: 'udhaar',
-                    amount: 15500,
-                    date: getTodayStr(),
-                    note: 'Opening Balance'
-                }]
-            }];
-        }
+
 
         localKhata.forEach(k => {
             if (!k.transactions) k.transactions = [];
@@ -6268,18 +6143,31 @@
             }
         }
 
-        function deleteStockItem(index) {
+        async function deleteStockItem(index) {
             if (confirm("Are you sure you want to delete this item?")) {
                 let item = localStock[index];
-                localStock.splice(index, 1);
-                document.getElementById('editStockOverlay').style.display = 'none';
-                renderUI();
-                showToast("Item Deleted");
+                TransactionEngine.showLoader("Deleting Item...");
 
-                if (item && item.id && String(item.id).startsWith("item_")) {
-                    fetch(`${RENDER_API_URL}/api/inventory/item/${item.id}?merchant_id=${MERCHANT_ID}`, {
-                        method: 'DELETE'
-                    }).catch(e => console.error("Failed to delete stock remotely", e));
+                try {
+                    if (item && item.id) {
+                        let res = await fetch(`${RENDER_API_URL}/api/inventory/item/${item.id}?merchant_id=${MERCHANT_ID}`, {
+                            method: 'DELETE'
+                        });
+
+                        if (!res.ok && res.status !== 404) {
+                            throw new Error("Failed to delete from server");
+                        }
+                    }
+
+                    localStock.splice(index, 1);
+                    document.getElementById('editStockOverlay').style.display = 'none';
+                    renderUI();
+                    showToast("Item Deleted Successfully");
+                } catch (e) {
+                    console.error("Delete failed", e);
+                    showToast("Failed to delete item. Try again.");
+                } finally {
+                    TransactionEngine.hideLoader();
                 }
             }
         }
@@ -8167,93 +8055,117 @@
             }
         }
 
-        function saveNewCustomer() {
+        async function saveNewCustomer() {
             let name = document.getElementById('newCustName').value;
             let phone = document.getElementById('newCustPhone').value;
             let bal = parseFloat(document.getElementById('newCustBalance').value) || 0;
             let balType = document.getElementById('newCustBalType').value;
             if (!name) return alert("Naam zaruri hai!");
             if (balType === 'advance') bal = -Math.abs(bal);
-            let cust = {
-                id: Date.now(),
-                name: name,
-                phone: phone,
-                balance: bal,
-                days: 0,
-                transactions: []
-            };
-            if (bal !== 0) cust.transactions.push({
-                id: Date.now(),
-                type: bal > 0 ? 'udhaar' : 'payment',
-                amount: Math.abs(bal),
-                date: getTodayStr(),
-                note: 'Opening Balance'
-            });
-            localKhata.push(cust);
-            saveStateToStorage();
-            closeModal('addCustomerModal');
-            renderUI();
-            showToast("Customer Added!");
-            document.getElementById('newCustName').value = '';
-            document.getElementById('newCustPhone').value = '';
-            document.getElementById('newCustBalance').value = '';
-            fetch(`${RENDER_API_URL}/api/khata/party`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    merchant_id: MERCHANT_ID,
-                    name: name,
-                    phone_number: phone,
-                    party_type: "CUSTOMER",
-                    initial_balance: bal
-                })
-            }).catch(e => console.warn(e));
+            
+            TransactionEngine.showLoader("Saving Grahak...");
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/khata/party`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        merchant_id: MERCHANT_ID,
+                        name: name,
+                        phone_number: phone,
+                        party_type: "CUSTOMER",
+                        initial_balance: bal
+                    })
+                });
+                let data = await res.json();
+                if (data.status === 'success') {
+                    let cust = {
+                        id: data.party_id,
+                        name: name,
+                        phone: phone,
+                        balance: bal,
+                        days: 0,
+                        transactions: []
+                    };
+                    if (bal !== 0) cust.transactions.push({
+                        id: Date.now(),
+                        type: bal > 0 ? 'udhaar' : 'payment',
+                        amount: Math.abs(bal),
+                        date: getTodayStr(),
+                        note: 'Opening Balance'
+                    });
+                    localKhata.unshift(cust);
+                    closeModal('addCustomerModal');
+                    renderUI();
+                    showToast("Customer Added Successfully!");
+                    document.getElementById('newCustName').value = '';
+                    document.getElementById('newCustPhone').value = '';
+                    document.getElementById('newCustBalance').value = '';
+                } else {
+                    showToast("Failed to save customer");
+                }
+            } catch (e) {
+                console.warn(e);
+                showToast("Network Error: Failed to save customer");
+            } finally {
+                TransactionEngine.hideLoader();
+            }
         }
 
-        function saveNewSupplier() {
+        async function saveNewSupplier() {
             let name = document.getElementById('newSupName').value;
             let bal = parseFloat(document.getElementById('newSupBalance').value) || 0;
             let balType = document.getElementById('newSupBalType').value;
             if (!name) return alert("Company naam zaruri hai!");
             if (balType === 'advance') bal = -Math.abs(bal);
-            let sup = {
-                id: Date.now(),
-                name: name,
-                phone: "",
-                balance: bal,
-                days: 0,
-                transactions: []
-            };
-            if (bal !== 0) sup.transactions.push({
-                id: Date.now(),
-                type: bal > 0 ? 'udhaar' : 'payment',
-                amount: Math.abs(bal),
-                date: getTodayStr(),
-                note: 'Opening Balance'
-            });
-            localSuppliers.push(sup);
-            saveStateToStorage();
-            closeModal('addSupplierModal');
-            renderUI();
-            showToast("Supplier Added!");
-            fetch(`${RENDER_API_URL}/api/khata/party`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    merchant_id: MERCHANT_ID,
-                    name: name,
-                    phone_number: "",
-                    party_type: "SUPPLIER",
-                    initial_balance: bal
-                })
-            }).catch(e => console.warn(e));
+            
+            TransactionEngine.showLoader("Saving Supplier...");
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/khata/party`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        merchant_id: MERCHANT_ID,
+                        name: name,
+                        phone_number: "",
+                        party_type: "SUPPLIER",
+                        initial_balance: bal
+                    })
+                });
+                let data = await res.json();
+                if (data.status === 'success') {
+                    let sup = {
+                        id: data.party_id,
+                        name: name,
+                        phone: "",
+                        balance: bal,
+                        days: 0,
+                        transactions: []
+                    };
+                    if (bal !== 0) sup.transactions.push({
+                        id: Date.now(),
+                        type: bal > 0 ? 'udhaar' : 'payment',
+                        amount: Math.abs(bal),
+                        date: getTodayStr(),
+                        note: 'Opening Balance'
+                    });
+                    localSuppliers.unshift(sup);
+                    closeModal('addSupplierModal');
+                    renderUI();
+                    showToast("Supplier Added Successfully!");
+                    document.getElementById('newSupName').value = '';
+                    document.getElementById('newSupBalance').value = '';
+                } else {
+                    showToast("Failed to save supplier");
+                }
+            } catch (e) {
+                console.warn(e);
+                showToast("Network Error: Failed to save supplier");
+            } finally {
+                TransactionEngine.hideLoader();
+            }
         }
 
-        function saveNewStock() {
+        async function saveNewStock() {
             let name = document.getElementById('nsName').value;
             let cat = document.getElementById('nsCat').value || 'General';
             let qty = parseFloat(document.getElementById('nsQty').value) || 0;
@@ -8261,52 +8173,64 @@
             let price = parseFloat(document.getElementById('nsPrice').value) || 0;
             if (!name) return alert("Item name is required!");
             let totalVal = price * qty;
+            
+            TransactionEngine.showLoader("Saving Item...");
 
             let tempId = Date.now();
-            localStock.push({
-                id: tempId,
-                name: name,
-                category: cat,
-                quantity: qty,
-                minStock: 10,
-                unit: unit,
-                price: price,
-                location: "Unassigned"
-            });
-            if (qty > 0) {
-                localDailyLedger.unshift({
-                    id: tempId,
-                    type: 'PURCHASE',
-                    item: name,
-                    qty: qty,
-                    amount: totalVal,
-                    timestamp: tempId,
-                    date: new Date().toLocaleString(),
-                    note: `Purchased ${name}`
-                });
-            }
-            saveStateToStorage();
-            closeModal('addStockModal');
-            renderUI();
-            showToast("Item Added!");
-            document.getElementById('nsName').value = '';
-            document.getElementById('nsCat').value = '';
-            document.getElementById('nsQty').value = '';
-            document.getElementById('nsPrice').value = '';
-
-            // Sync to backend
             let formData = new FormData();
             formData.append('merchant_id', MERCHANT_ID);
-            formData.append('item_id', String(tempId));
+            formData.append('item_id', String(tempId)); // Temporary ID, backend will create real one if not found
             formData.append('item_name', name);
             formData.append('quantity_change', qty);
             formData.append('unit', unit);
             formData.append('price', price);
 
-            fetch(`${RENDER_API_URL}/api/inventory/ADD_STOCK`, {
-                method: 'POST',
-                body: formData
-            }).catch(e => console.warn("Failed to sync new stock to backend:", e));
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/inventory/ADD_STOCK`, {
+                    method: 'POST',
+                    body: formData
+                });
+                let data = await res.json();
+                
+                if (data.status === 'success') {
+                    localStock.push({
+                        id: data.item_id, // Use real ID
+                        name: name,
+                        category: cat,
+                        quantity: qty,
+                        minStock: 10,
+                        unit: unit,
+                        price: price,
+                        location: "Unassigned"
+                    });
+                    if (qty > 0) {
+                        localDailyLedger.unshift({
+                            id: Date.now(),
+                            type: 'PURCHASE',
+                            item: name,
+                            qty: qty,
+                            amount: totalVal,
+                            timestamp: Date.now(),
+                            date: new Date().toLocaleString(),
+                            note: `Purchased ${name}`
+                        });
+                    }
+                    closeModal('addStockModal');
+                    renderUI();
+                    showToast("Item Added Successfully!");
+                    document.getElementById('nsName').value = '';
+                    document.getElementById('nsCat').value = '';
+                    document.getElementById('nsQty').value = '';
+                    document.getElementById('nsPrice').value = '';
+                } else {
+                    showToast("Failed to save item.");
+                }
+            } catch(e) {
+                console.warn(e);
+                showToast("Network Error: Failed to save stock.");
+            } finally {
+                TransactionEngine.hideLoader();
+            }
         }
 
         function initShopSathi() {
