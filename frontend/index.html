@@ -2573,6 +2573,118 @@
             color: var(--primary);
             white-space: nowrap;
         }
+        
+        /* ================= EVIDENCE GALLERY UI ================= */
+        .evidence-tabs {
+            display: flex;
+            gap: 10px;
+            padding: 16px 20px 0;
+            background: white;
+            border-bottom: 1px solid var(--border);
+        }
+        .evd-tab {
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ink-muted);
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+        }
+        .evd-tab.active {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+        }
+        
+        .evd-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            padding: 16px 20px;
+        }
+        .evd-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .evd-thumb {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            cursor: pointer;
+        }
+        .evd-info {
+            padding: 8px;
+            font-size: 12px;
+        }
+        .evd-date {
+            color: var(--ink-muted);
+            font-size: 10px;
+        }
+        .evd-tag {
+            color: var(--primary);
+            font-weight: 600;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Full Screen Viewer */
+        .viewer-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 10000;
+            display: none;
+            flex-direction: column;
+        }
+        .viewer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            color: white;
+        }
+        .viewer-header i {
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .viewer-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+        .viewer-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: transform 0.3s ease;
+        }
+        .viewer-footer {
+            display: flex;
+            justify-content: space-around;
+            padding: 20px;
+            color: white;
+            background: rgba(0,0,0,0.8);
+        }
+        .viewer-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .viewer-btn i {
+            font-size: 20px;
+        }
+
         /* ================= KHATASNAP MAIN TAB UI ================= */
         
         .snap-hero {
@@ -3568,10 +3680,29 @@
                 </div>
             </div>
 
-            <div class="tx-list" style="background: white; padding-top: 8px;">
+
+            <div class="evidence-tabs">
+                <div class="evd-tab active" id="tabTxnBtn" onclick="switchLedgerTab('txn')">Transactions</div>
+                <div class="evd-tab" id="tabEvdBtn" onclick="switchLedgerTab('evd')">Evidence</div>
+            </div>
+
+            <div id="ledgerTxnSection" class="tx-list" style="background: white; padding-top: 8px;">
                 <div class="tx-header" style="padding-top:16px;">Recent Transactions <span>View All <i class="ti ti-chevron-right" style="font-size:10px;"></i></span></div>
                 <div id="ledgerTxList"></div>
             </div>
+            
+            <div id="ledgerEvdSection" style="display:none; background:var(--background); min-height: 300px;">
+                <div style="padding: 16px 20px; display:flex; gap:10px;">
+                    <button class="primary-btn" style="flex:1; margin:0;" onclick="document.getElementById('evdCameraInput').click()"><i class="ti ti-camera"></i> Add Photo</button>
+                    <button class="btn-outline" style="flex:1; margin:0; background:white;" onclick="document.getElementById('evdGalleryInput').click()"><i class="ti ti-upload"></i> Upload</button>
+                    <input type="file" id="evdCameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleEvidenceUpload(event)">
+                    <input type="file" id="evdGalleryInput" accept="image/*" style="display:none" onchange="handleEvidenceUpload(event)">
+                </div>
+                <div id="evidenceList" class="evd-grid">
+                    <!-- Evidence items will be injected here -->
+                </div>
+            </div>
+
             <div class="ledger-actions">
                 <div class="la-row"><button class="btn-outline red" onclick="openTxModal('udhaar')"><i class="ti ti-minus"></i> Udhaar</button><button class="btn-outline green" onclick="openTxModal('payment')"><i class="ti ti-plus"></i> Jama</button></div>
                 <div class="la-row">
@@ -7597,7 +7728,193 @@
             }
         }
 
+        
+        // ================= EVIDENCE GALLERY LOGIC =================
+        let currentEvidenceList = [];
+        let currentViewerEvd = null;
+        let isEvdZoomed = false;
+
+        function switchLedgerTab(tab) {
+            if (tab === 'txn') {
+                document.getElementById('tabTxnBtn').classList.add('active');
+                document.getElementById('tabEvdBtn').classList.remove('active');
+                document.getElementById('ledgerTxnSection').style.display = 'block';
+                document.getElementById('ledgerEvdSection').style.display = 'none';
+            } else {
+                document.getElementById('tabTxnBtn').classList.remove('active');
+                document.getElementById('tabEvdBtn').classList.add('active');
+                document.getElementById('ledgerTxnSection').style.display = 'none';
+                document.getElementById('ledgerEvdSection').style.display = 'block';
+                fetchEvidence();
+            }
+        }
+
+        async function fetchEvidence() {
+            if (!currentLedgerPerson) return;
+            document.getElementById('evidenceList').innerHTML = '<div style="grid-column: span 2; text-align:center; padding:20px;"><i class="ti ti-loader" style="animation: spin 1s linear infinite;"></i> Loading...</div>';
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/evidence/${currentLedgerPerson.id}?merchant_id=${MERCHANT_ID}`);
+                let json = await res.json();
+                if (json.status === 'success') {
+                    currentEvidenceList = json.data;
+                    renderEvidence();
+                }
+            } catch (e) {
+                console.error(e);
+                document.getElementById('evidenceList').innerHTML = '<div style="grid-column: span 2; text-align:center; padding:20px; color:var(--red);">Failed to load evidence.</div>';
+            }
+        }
+
+        function renderEvidence() {
+            let html = '';
+            if (currentEvidenceList.length === 0) {
+                document.getElementById('evidenceList').innerHTML = '<div style="grid-column: span 2; text-align:center; padding:40px 20px; color:var(--ink-muted);"><i class="ti ti-photo" style="font-size:32px; opacity:0.5; margin-bottom:10px; display:block;"></i>No evidence found.<br><span style="font-size:12px;">Add photos or upload bills to keep a record.</span></div>';
+                return;
+            }
+            
+            currentEvidenceList.forEach(evd => {
+                let url = evd.image_path.startsWith('http') ? evd.image_path : RENDER_API_URL + evd.image_path;
+                let dateStr = formatDate(evd.created_at);
+                let tagStr = evd.tag ? evd.tag : (evd.note ? evd.note : 'Bill/Receipt');
+                html += `
+                    <div class="evd-card" onclick="openEvidenceViewer('${evd.evidence_id}')">
+                        <img src="${url}" class="evd-thumb" alt="Evidence">
+                        <div class="evd-info">
+                            <div class="evd-tag">${tagStr}</div>
+                            <div class="evd-date">${dateStr}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('evidenceList').innerHTML = html;
+        }
+
+        async function handleEvidenceUpload(event) {
+            let file = event.target.files[0];
+            if (!file || !currentLedgerPerson) return;
+            
+            showToast('Uploading evidence...');
+            let formData = new FormData();
+            formData.append('merchant_id', MERCHANT_ID);
+            formData.append('party_id', currentLedgerPerson.id);
+            formData.append('party_type', currentLedgerType === 'customer' ? 'CUSTOMER' : 'SUPPLIER');
+            formData.append('file', file);
+            
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/evidence/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                let json = await res.json();
+                if (json.status === 'success') {
+                    showToast('Evidence saved securely!');
+                    fetchEvidence();
+                } else {
+                    showToast('Upload failed.');
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('Error uploading evidence.');
+            }
+            event.target.value = '';
+        }
+
+        function openEvidenceViewer(evdId) {
+            currentViewerEvd = currentEvidenceList.find(e => e.evidence_id === evdId);
+            if (!currentViewerEvd) return;
+            
+            let url = currentViewerEvd.image_path.startsWith('http') ? currentViewerEvd.image_path : RENDER_API_URL + currentViewerEvd.image_path;
+            document.getElementById('evdViewerImg').src = url;
+            document.getElementById('evdViewerImg').style.transform = 'scale(1)';
+            isEvdZoomed = false;
+            
+            let tagStr = currentViewerEvd.tag || 'Evidence';
+            document.getElementById('evdViewerTitle').innerText = tagStr;
+            
+            document.getElementById('evdViewer').style.display = 'flex';
+        }
+
+        function closeEvidenceViewer() {
+            document.getElementById('evdViewer').style.display = 'none';
+            currentViewerEvd = null;
+        }
+
+        function zoomEvidence() {
+            let img = document.getElementById('evdViewerImg');
+            isEvdZoomed = !isEvdZoomed;
+            img.style.transform = isEvdZoomed ? 'scale(2)' : 'scale(1)';
+        }
+
+        async function shareEvidence() {
+            if (!currentViewerEvd) return;
+            let url = currentViewerEvd.image_path.startsWith('http') ? currentViewerEvd.image_path : RENDER_API_URL + currentViewerEvd.image_path;
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'ShopSathi Evidence',
+                        text: `Evidence for ${currentLedgerPerson.name}`,
+                        url: url
+                    });
+                } catch (e) {
+                    console.error('Error sharing:', e);
+                }
+            } else {
+                window.open(url, '_blank');
+            }
+        }
+
+        async function renameEvidence() {
+            if (!currentViewerEvd) return;
+            let newTag = prompt("Enter a tag/name for this evidence (e.g. Bill, Receipt, Payment Slip):", currentViewerEvd.tag || "");
+            if (newTag === null) return; // User cancelled
+            
+            let newNote = prompt("Enter an optional note:", currentViewerEvd.note || "");
+            if (newNote === null) newNote = currentViewerEvd.note;
+            
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/evidence/${currentViewerEvd.evidence_id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        merchant_id: MERCHANT_ID,
+                        tag: newTag,
+                        note: newNote
+                    })
+                });
+                let json = await res.json();
+                if (json.status === 'success') {
+                    showToast('Updated successfully!');
+                    document.getElementById('evdViewerTitle').innerText = newTag || 'Evidence';
+                    currentViewerEvd.tag = newTag;
+                    currentViewerEvd.note = newNote;
+                    renderEvidence();
+                }
+            } catch (e) {
+                showToast('Failed to update.');
+            }
+        }
+
+        async function deleteEvidence() {
+            if (!currentViewerEvd) return;
+            if (!confirm("Are you sure you want to permanently delete this evidence?")) return;
+            
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/evidence/${currentViewerEvd.evidence_id}?merchant_id=${MERCHANT_ID}`, {
+                    method: 'DELETE'
+                });
+                let json = await res.json();
+                if (json.status === 'success') {
+                    showToast('Evidence deleted.');
+                    closeEvidenceViewer();
+                    fetchEvidence();
+                }
+            } catch (e) {
+                showToast('Failed to delete.');
+            }
+        }
+
         function renderLedgerView() {
+            switchLedgerTab('txn');
             let p = currentLedgerPerson;
             document.getElementById('ledgerTypeTitle').innerText = currentLedgerType === 'customer' ? 'Customer Details' : 'Supplier Details';
             let lAvatar = document.getElementById('lAvatar');

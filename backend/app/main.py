@@ -11,6 +11,7 @@ from app.routes import snap
 from app.routes import sales
 from app.routes import notifications
 from app.routes import stats
+from app.routes import evidence
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ShopSathiCore")
 
@@ -31,6 +32,7 @@ app.include_router(snap.router, prefix="/api/snap", tags=["Vision OCR"])
 app.include_router(sales.router, prefix="/api/sales", tags=["Daily Sales"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(stats.router, prefix="/api/stats", tags=["Stats"])
+app.include_router(evidence.router, prefix="/api/evidence", tags=["Evidence"])
 
 # Mount uploads directory for images
 import os
@@ -151,6 +153,22 @@ def materialize_tables():
                 FOREIGN KEY(merchant_id) REFERENCES merchants(merchant_id)
             );
         """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS evidence (
+                evidence_id TEXT PRIMARY KEY,
+                merchant_id TEXT NOT NULL,
+                party_id TEXT NOT NULL,
+                party_type TEXT NOT NULL,
+                image_path TEXT NOT NULL,
+                tag TEXT,
+                note TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(merchant_id) REFERENCES merchants(merchant_id),
+                FOREIGN KEY(party_id) REFERENCES parties(party_id)
+            );
+        """)
+        
         conn.commit()
         logger.info("Database schemas initialized successfully.")
 
