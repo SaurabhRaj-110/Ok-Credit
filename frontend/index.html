@@ -4229,19 +4229,19 @@
             <div class="drawer-section">
                 <div class="drawer-sec-title">Today's Overview</div>
                 <div class="drawer-stats-box">
-                    <div class="ds-row" style="cursor:pointer;" onclick="showEntriesMode('Voice')">
+                    <div class="ds-row">
                         <span>Voice Entries</span>
                         <span style="font-weight:600;" id="drawer-voice-cnt">0</span>
                     </div>
-                    <div class="ds-row" style="cursor:pointer;" onclick="showEntriesMode('Manual')">
+                    <div class="ds-row">
                         <span>Manual Entries</span>
                         <span style="font-weight:600;" id="drawer-manual-cnt">0</span>
                     </div>
-                    <div class="ds-row" style="cursor:pointer;" onclick="showEntriesMode('Snap')">
+                    <div class="ds-row">
                         <span>KhataSnap (OCR)</span>
                         <span style="font-weight:600;" id="drawer-ocr-cnt">0</span>
                     </div>
-                    <div class="ds-row" style="cursor:pointer;" onclick="showEntriesMode('Other')">
+                    <div class="ds-row">
                         <span>Other / Imports</span>
                         <span style="font-weight:600;" id="drawer-other-cnt">0</span>
                     </div>
@@ -8325,16 +8325,6 @@
             
             // Setup periodic polling for notifications
             setInterval(fetchNotifications, 60000); // Check every minute
-        }
-        
-                function showEntriesMode(mode) {
-            closeMenuDrawer();
-            switchTab('tab-home', document.getElementById('nav-home'));
-            setTimeout(() => {
-                let searchInput = document.getElementById('searchInput');
-                searchInput.value = mode;
-                openSearch();
-            }, 300);
         }
         
         // ==========================================
