@@ -4098,19 +4098,19 @@
             <div class="drawer-section">
                 <div class="drawer-sec-title">Today's Overview</div>
                 <div class="drawer-stats-box">
-                    <div class="ds-row">
+                    <div class="ds-row" style="cursor:pointer;" onclick="showEntriesMode(\'Voice\')">
                         <span>Voice Entries</span>
                         <span style="font-weight:600;" id="drawer-voice-cnt">0</span>
                     </div>
-                    <div class="ds-row">
+                    <div class="ds-row" style="cursor:pointer;" onclick="showEntriesMode(\'Manual\')">
                         <span>Manual Entries</span>
                         <span style="font-weight:600;" id="drawer-manual-cnt">0</span>
                     </div>
-                    <div class="ds-row">
+                    <div class="ds-row" style="cursor:pointer;" onclick="showEntriesMode(\'Snap\')">
                         <span>KhataSnap (OCR)</span>
                         <span style="font-weight:600;" id="drawer-ocr-cnt">0</span>
                     </div>
-                    <div class="ds-row">
+                    <div class="ds-row" style="cursor:pointer;" onclick="showEntriesMode(\'Other\')">
                         <span>Other / Imports</span>
                         <span style="font-weight:600;" id="drawer-other-cnt">0</span>
                     </div>
@@ -4128,7 +4128,7 @@
                     <div class="dmi-icon"><i class="ti ti-settings"></i></div>
                     <div class="dmi-text">Settings</div>
                 </div>
-                <div class="drawer-menu-item">
+                <div class="drawer-menu-item" onclick="alert(\'Contact: Saurabh raj - 9142150520\')">
                     <div class="dmi-icon"><i class="ti ti-headset"></i></div>
                     <div class="dmi-text">Help & Support</div>
                 </div>
@@ -5069,13 +5069,7 @@
 
         function renderUI() {
             try {
-                let bell = document.getElementById('bellCount');
-                if (unreadCount > 0) {
-                    bell.style.display = 'flex';
-                    bell.innerText = unreadCount;
-                } else {
-                    bell.style.display = 'none';
-                }
+                if (typeof updateBellCount === 'function') updateBellCount();
 
                 // Recalculate Live Sales directly from the Ledger data so it is NEVER wrong!
                 let liveSales = 0;
@@ -7400,16 +7394,28 @@
         }
 
         function addNotification(title, message, type = 'info') {
-            localNotifications.unshift({
-                id: Date.now(),
-                title,
-                message,
-                type,
-                date: new Date().toLocaleString()
-            });
-            unreadCount++;
-            saveStateToStorage();
-            renderUI();
+            let n = {
+                id: String(Date.now()),
+                title: title,
+                message: message,
+                type: type,
+                category: 'System',
+                timestamp: new Date().toISOString(),
+                is_read: 0
+            };
+            allNotifications.unshift(n);
+            if (typeof updateBellCount === 'function') updateBellCount();
+            
+            let formData = new FormData();
+            formData.append('merchant_id', MERCHANT_ID);
+            formData.append('title', title);
+            formData.append('message', message);
+            formData.append('type', type);
+            formData.append('category', 'System');
+            fetch(`${RENDER_API_URL}/api/notifications/`, {
+                method: 'POST',
+                body: formData
+            }).catch(e => console.warn(e));
         }
 
         function openNotifications() {
@@ -7641,7 +7647,7 @@
                 let isSub = (currentLedgerType === 'customer' && tx.type === 'payment') || (currentLedgerType === 'supplier' && tx.type === 'payment');
                 let sign = tx.type === 'order' ? '' : (isAdd ? '+ ' : '- ');
                 let colorClass = tx.type === 'order' ? '' : (isAdd ? 'red' : 'green');
-                let typeTitle = tx.type === 'udhaar' ? 'Udhaar' : tx.type === 'payment' ? 'Payment' : 'Order';
+                let typeTitle = tx.type === 'udhaar' ? (tx.note && (tx.note.includes('Snap') || tx.note.includes('Bill')) ? 'Bill' : 'Udhaar') : tx.type === 'payment' ? 'Payment' : 'Order';
                 let amtStr = tx.amount ? `${sign}₹${tx.amount}` : '';
                 let subText = tx.type === 'order' && tx.dueDate ? `Due: ${formatDate(tx.dueDate)}` : (tx.note || '');
 
@@ -7994,6 +8000,16 @@
             
             // Setup periodic polling for notifications
             setInterval(fetchNotifications, 60000); // Check every minute
+        }
+        
+                function showEntriesMode(mode) {
+            closeMenuDrawer();
+            switchTab('tab-home', document.getElementById('nav-home'));
+            setTimeout(() => {
+                let searchInput = document.getElementById('searchInput');
+                searchInput.value = mode;
+                openSearch();
+            }, 300);
         }
         
         // ==========================================
