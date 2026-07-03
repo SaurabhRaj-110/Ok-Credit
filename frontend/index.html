@@ -6910,6 +6910,8 @@
             if (e.target.files && e.target.files.length > 0) {
                 let file = e.target.files[0];
                 document.getElementById('billScanOverlay').style.display = 'none';
+                
+                let myScanSessionId = ++currentScanSessionId;
 
                 openBillAnalyzingStep(); // Show UI loading states
 
@@ -6928,6 +6930,11 @@
                             method: 'POST',
                             body: formData
                         });
+                        
+                        if (myScanSessionId !== currentScanSessionId) {
+                            console.log("Scan cancelled by user. Aborting processing.");
+                            return;
+                        }
 
                         if (!res.ok) {
                             let errData = await res.json().catch(() => ({}));
@@ -6997,6 +7004,7 @@
                             document.getElementById('bsAnalyzingFooterTitle').innerText = "AI is busy, retrying...";
                             document.getElementById('bsAnalyzingFooterSub').innerText = `Attempt ${attempt + 2} of ${maxRetries}`;
                             await new Promise(r => setTimeout(r, retryDelay));
+                            if (myScanSessionId !== currentScanSessionId) return;
                             retryDelay *= 2; // Exponential backoff (1s, 2s, 4s)
                         }
                     }
@@ -7042,8 +7050,8 @@
 
                     let btnHtml = `
                     <div id="bsErrorBtns" style="display:flex; gap:10px; margin-top:16px; width:100%; flex-wrap:wrap;">
-                        <button style="flex:1; min-width:100px; padding:12px; border:1px solid #dc2626; background:white; color:#dc2626; border-radius:8px; font-weight:700;" onclick="document.getElementById('billAnalyzingOverlay').style.display='none';">Cancel</button>
-                        <button style="flex:1; min-width:100px; padding:12px; border:none; background:#dc2626; color:white; border-radius:8px; font-weight:700;" onclick="document.getElementById('cameraInputReal').click(); document.getElementById('billAnalyzingOverlay').style.display='none';">Upload Again</button>
+                        <button style="flex:1; min-width:100px; padding:12px; border:1px solid #dc2626; background:white; color:#dc2626; border-radius:8px; font-weight:700;" onclick="currentScanSessionId++; document.getElementById('billAnalyzingOverlay').style.display='none';">Cancel</button>
+                        <button style="flex:1; min-width:100px; padding:12px; border:none; background:#dc2626; color:white; border-radius:8px; font-weight:700;" onclick="currentScanSessionId++; document.getElementById('cameraInputReal').click(); document.getElementById('billAnalyzingOverlay').style.display='none';">Upload Again</button>
                         ${!isAuthError ? `<button style="width:100%; padding:12px; border:none; background:#6366f1; color:white; border-radius:8px; font-weight:700; margin-top:4px;" onclick="openManualBillEntry()">✏️ Enter Manually</button>` : ''}
                     </div>`;
                     footer.insertAdjacentHTML('beforeend', btnHtml);
@@ -7265,9 +7273,11 @@
         }
 
         let bsLastSaveSummary = null;
+        let currentScanSessionId = 0;
 
         // Manual fallback when OCR fails
         function openManualBillEntry() {
+            currentScanSessionId++; // Abort any pending background OCR fetches
             // Close the error overlay
             document.getElementById('billAnalyzingOverlay').style.display = 'none';
 
@@ -7281,10 +7291,10 @@
             bsImagePath = null;
 
             // Open review in edit mode
-            bsEditMode = true;
             openBillReviewStep();
             // Force edit mode toggle
             setTimeout(() => {
+                bsEditMode = true;
                 document.getElementById('bsReviewEditToggle').innerText = 'Done';
                 document.getElementById('bsEditItemsBtn').innerText = 'Done Editing';
                 renderBillReviewItems();
