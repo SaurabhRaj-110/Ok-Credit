@@ -13,145 +13,140 @@
 <body>
 
     
+    
     <!-- SPLASH & LOGIN OVERLAY -->
-    <div id="splashLoginOverlay" style="position: fixed; inset: 0; background: #0c8854; z-index: 10000; display: flex; flex-direction: column; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif;">
-        <!-- Top Half (Green Background with Logo) -->
-        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; color: white; position: relative;">
-            <div style="background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 24px; position: relative; z-index: 2;">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#0c8854" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                </svg>
-            </div>
-            <h1 style="font-size: 32px; font-weight: 800; margin: 0 0 8px; position: relative; z-index: 2;">ShopSaathi AI</h1>
-            <p style="font-size: 16px; opacity: 0.9; margin: 0; line-height: 1.4; position: relative; z-index: 2;">Aapka AI Saathi, Har Kaam<br>Asaan Banaye</p>
-        </div>
+    <div id="splashLoginOverlay" style="position: fixed; inset: 0; background: #f8fafc; z-index: 10000; display: flex; flex-direction: column; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif;">
         
-        <!-- Bottom Sheet Wrapper -->
-        <div style="background: white; border-top-left-radius: 32px; border-top-right-radius: 32px; padding: 32px 24px; display: flex; flex-direction: column; position: relative;">
+        <!-- STEP 1: WELCOME SCREEN -->
+        <div id="loginStep1" style="display: flex; flex-direction: column; height: 100%;">
+            <!-- Top Half with Image -->
+            <div style="flex: 1; position: relative; display: flex; flex-direction: column; justify-content: center; padding: 32px 24px; color: white;">
+                <div style="position: absolute; inset: 0; background-image: url('https://images.unsplash.com/photo-1601597111158-2fceff292cdc?q=80&w=800'); background-size: cover; background-position: center;"></div>
+                <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(12, 136, 84, 0.95));"></div>
+                
+                <h1 style="font-size: 36px; font-weight: 800; margin: 0 0 12px; position: relative; z-index: 2; line-height: 1.1;">
+                    <span style="color: #4ade80;">Aapka Saathi,</span><br>Har Kaam Aasaan
+                </h1>
+                <p style="font-size: 18px; opacity: 0.9; margin: 0; line-height: 1.4; position: relative; z-index: 2;">
+                    Dukaan ka har record,<br>ab ek app mein.
+                </p>
+            </div>
             
-            <!-- STEP 1: WELCOME SCREEN -->
-            <div id="loginStep1" style="display: flex; flex-direction: column; gap: 24px;">
-                <div>
-                    <h2 style="font-size: 24px; font-weight: 800; color: #0c8854; margin-bottom: 8px;">Welcome!</h2>
-                    <p style="color: #64748b; font-size: 14px; margin: 0;">Login to manage your shop smarter and faster.</p>
+            <!-- Bottom Sheet -->
+            <div style="background: white; border-top-left-radius: 32px; border-top-right-radius: 32px; padding: 32px 24px 40px; display: flex; flex-direction: column; margin-top: -32px; position: relative; z-index: 5;">
+                
+                <div style="display: flex; justify-content: space-between; margin-bottom: 32px;">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                        <div style="width: 56px; height: 56px; border-radius: 50%; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #0c8854; font-size: 24px;"><i class="ti ti-book"></i></div>
+                        <span style="font-size: 12px; font-weight: 600; color: #0f172a; text-align: center;">Khata<br>Manage</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                        <div style="width: 56px; height: 56px; border-radius: 50%; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #0c8854; font-size: 24px;"><i class="ti ti-microphone"></i></div>
+                        <span style="font-size: 12px; font-weight: 600; color: #0f172a; text-align: center;">Voice se<br>Entry</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                        <div style="width: 56px; height: 56px; border-radius: 50%; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #0c8854; font-size: 24px;"><i class="ti ti-camera"></i></div>
+                        <span style="font-size: 12px; font-weight: 600; color: #0f172a; text-align: center;">Bill Scan<br>(OCR)</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                        <div style="width: 56px; height: 56px; border-radius: 50%; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #0c8854; font-size: 24px;"><i class="ti ti-chart-bar"></i></div>
+                        <span style="font-size: 12px; font-weight: 600; color: #0f172a; text-align: center;">Business<br>Insights</span>
+                    </div>
                 </div>
                 
-                <div style="display: flex; flex-direction: column; gap: 16px;">
-                    <div style="display: flex; gap: 16px; align-items: flex-start;">
-                        <div style="width: 40px; height: 40px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;"><i class="ti ti-microphone"></i></div>
-                        <div><div style="font-weight: 700; color: #0f172a; margin-bottom: 2px;">Voice AI</div><div style="font-size: 13px; color: #64748b;">Add entries with your voice</div></div>
-                    </div>
-                    <div style="display: flex; gap: 16px; align-items: flex-start;">
-                        <div style="width: 40px; height: 40px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;"><i class="ti ti-camera"></i></div>
-                        <div><div style="font-weight: 700; color: #0f172a; margin-bottom: 2px;">KhataSnap (OCR)</div><div style="font-size: 13px; color: #64748b;">Scan bills and update records</div></div>
-                    </div>
-                    <div style="display: flex; gap: 16px; align-items: flex-start;">
-                        <div style="width: 40px; height: 40px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;"><i class="ti ti-chart-bar"></i></div>
-                        <div><div style="font-weight: 700; color: #0f172a; margin-bottom: 2px;">Smart Insights</div><div style="font-size: 13px; color: #64748b;">Track business and grow more</div></div>
-                    </div>
+                <button onclick="document.getElementById('loginStep1').style.display='none'; document.getElementById('loginStep2').style.display='flex';" style="width: 100%; padding: 18px; border-radius: 16px; border: none; background: #0c8854; color: white; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; margin-bottom: 16px;">
+                    <i class="ti ti-phone"></i> Login / Sign Up with Phone
+                </button>
+                
+                <div style="text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 16px; position: relative;">
+                    <span style="background: white; padding: 0 12px; position: relative; z-index: 1;">ya</span>
+                    <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #e2e8f0;"></div>
                 </div>
                 
-                <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
-                    <button onclick="document.getElementById('loginStep1').style.display='none'; document.getElementById('loginStep2').style.display='flex';" style="width: 100%; padding: 16px; border-radius: 12px; border: none; background: #0c8854; color: white; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-                        <div style="display:flex; align-items:center; gap:8px;"><i class="ti ti-phone"></i> Continue with Phone</div> <i class="ti ti-arrow-right"></i>
-                    </button>
-                    <button onclick="showToast('Google login coming soon!')" style="width: 100%; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; background: white; color: #0f172a; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
-                        <i class="ti ti-brand-google" style="color: #ea4335;"></i> Continue with Google
-                    </button>
-                    <div style="text-align: center; color: #64748b; font-size: 13px; margin: 4px 0;">or</div>
-                    <button onclick="document.getElementById('loginPhoneInput').value='+919999999999'; requestOTP();" style="width: 100%; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; background: #f8fafc; color: #0f172a; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
-                        <i class="ti ti-building-store"></i> Continue as Demo User
-                    </button>
-                </div>
+                <button onclick="showToast('Google login coming soon!')" style="width: 100%; padding: 18px; border-radius: 16px; border: 1px solid #e2e8f0; background: white; color: #0f172a; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+                    <i class="ti ti-brand-google" style="color: #ea4335;"></i> Login with Google
+                </button>
                 
-                <div style="text-align: center; font-size: 12px; color: #64748b; display: flex; align-items: center; justify-content: center; gap: 4px;">
-                    <i class="ti ti-shield-check" style="color: #10b981;"></i> Your data is safe and secure
+                <div style="text-align: center; font-size: 13px; font-weight: 600; color: #10b981; display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 24px;">
+                    <i class="ti ti-shield-check"></i> 100% Safe & Secure
                 </div>
                 <div style="text-align: center; font-size: 11px; color: #94a3b8; margin-top: 8px;">v1.0.0 (Beta)</div>
             </div>
+        </div>
+        
+        <!-- STEP 2: PHONE ENTRY SCREEN -->
+        <div id="loginStep2" style="display: none; flex-direction: column; height: 100%; background: white;">
             
-            <!-- STEP 2: PHONE ENTRY SCREEN -->
-            <div id="loginStep2" style="display: none; flex-direction: column; gap: 24px; padding-top: 16px;">
-                <div style="position: absolute; top: -70px; left: 16px; color: white; cursor: pointer; padding: 12px;" onclick="document.getElementById('loginStep2').style.display='none'; document.getElementById('loginStep1').style.display='flex';">
-                    <i class="ti ti-arrow-left" style="font-size: 24px;"></i>
-                </div>
-                
-                <div style="text-align: center; margin-bottom: -16px;">
-                    <div style="width: 64px; height: 64px; background: #f0fdf4; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; color: #16a34a; font-size: 32px; position: relative;">
-                        <i class="ti ti-device-mobile"></i>
-                        <div style="position: absolute; bottom: -4px; right: -4px; width: 24px; height: 24px; background: #16a34a; border-radius: 50%; color: white; font-size: 14px; display: flex; align-items: center; justify-content: center; border: 2px solid white;"><i class="ti ti-check"></i></div>
-                    </div>
-                </div>
-                
-                <div>
-                    <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 8px;">Login with Phone</h2>
-                    <p style="color: #64748b; font-size: 14px; margin: 0;">Enter your mobile number to continue</p>
-                </div>
-                
-                <div style="display: flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 12px; padding: 4px 16px; focus-within: border-color: #0c8854;">
-                    <span style="font-size: 16px; font-weight: 600; color: #0f172a; border-right: 1px solid #e2e8f0; padding-right: 12px; margin-right: 12px; display: flex; align-items: center; gap: 4px;">+91 <i class="ti ti-chevron-down" style="font-size: 14px;"></i></span>
-                    <input type="tel" id="loginPhoneInput" placeholder="9142150520" style="flex: 1; border: none; font-size: 18px; padding: 12px 0; outline: none; font-weight: 600; color: #0f172a;">
-                    <i class="ti ti-circle-check-filled" style="color: #10b981; font-size: 20px;"></i>
-                </div>
-                
-                <button onclick="requestOTP()" style="width: 100%; padding: 16px; border-radius: 12px; border: none; background: #0c8854; color: white; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-                    Send OTP <i class="ti ti-send"></i>
-                </button>
-                
-                <div style="text-align: left; font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 4px;">
-                    <i class="ti ti-lock"></i> We will send you a 6-digit OTP to verify your number
-                </div>
+            <div style="background: #0c8854; color: white; padding: 24px 24px 48px; position: relative;">
+                <i class="ti ti-arrow-left" style="font-size: 24px; cursor: pointer; margin-bottom: 24px; display: block;" onclick="document.getElementById('loginStep2').style.display='none'; document.getElementById('loginStep1').style.display='flex';"></i>
+                <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 8px;">Chaliye shuru karte hain 👋</h2>
+                <p style="font-size: 14px; opacity: 0.9; margin: 0; line-height: 1.4;">Apna mobile number daalein<br>taaki hum aapko pehchaan sakein</p>
+                <div class="scallop-edge"></div>
             </div>
             
-            <!-- STEP 3: OTP VERIFICATION SCREEN -->
-            <div id="loginStep3" style="display: none; flex-direction: column; gap: 24px;">
-                <div>
-                    <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 8px;">Enter OTP</h2>
-                    <p style="color: #64748b; font-size: 14px; margin: 0;">We've sent a 6-digit code to</p>
-                    <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-top: 4px;">
-                        <span id="displayPhoneOTP">+91 9142150520</span> 
-                        <span style="color: #16a34a; font-weight: 600; cursor: pointer; margin-left: 8px;" onclick="document.getElementById('loginStep3').style.display='none'; document.getElementById('loginStep2').style.display='flex';">Change</span>
-                    </div>
+            <div style="padding: 32px 24px; display: flex; flex-direction: column; align-items: center; margin-top: 24px;">
+                <div style="width: 80px; height: 80px; background: #f0fdf4; border-radius: 24px; display: flex; align-items: center; justify-content: center; color: #16a34a; font-size: 40px; position: relative; margin-bottom: 32px;">
+                    <i class="ti ti-building-store"></i>
+                    <div style="position: absolute; bottom: -4px; right: -4px; width: 28px; height: 28px; background: #16a34a; border-radius: 50%; color: white; font-size: 16px; display: flex; align-items: center; justify-content: center; border: 3px solid white;"><i class="ti ti-check"></i></div>
                 </div>
                 
-                <div style="display: flex; justify-content: space-between; gap: 8px;">
-                    <input type="text" maxlength="1" class="otp-box" onkeyup="moveToNext(this, 'otp2')" id="otp1">
-                    <input type="text" maxlength="1" class="otp-box" onkeyup="moveToNext(this, 'otp3', 'otp1')" id="otp2">
-                    <input type="text" maxlength="1" class="otp-box" onkeyup="moveToNext(this, 'otp4', 'otp2')" id="otp3">
-                    <input type="text" maxlength="1" class="otp-box" onkeyup="moveToNext(this, 'otp5', 'otp3')" id="otp4">
-                    <input type="text" maxlength="1" class="otp-box" onkeyup="moveToNext(this, 'otp6', 'otp4')" id="otp5">
-                    <input type="text" maxlength="1" class="otp-box" onkeyup="verifyOTP(this, 'otp5')" id="otp6">
+                <div style="display: flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 12px; padding: 8px 16px; width: 100%; margin-bottom: 24px; focus-within: border-color: #0c8854;">
+                    <span style="font-size: 16px; font-weight: 600; color: #0f172a; border-right: 1px solid #e2e8f0; padding-right: 12px; margin-right: 12px; display: flex; align-items: center; gap: 4px;">+91 <i class="ti ti-chevron-down" style="font-size: 14px;"></i></span>
+                    <input type="tel" id="loginPhoneInput" oninput="validatePhone()" placeholder="9142150520" maxlength="10" style="flex: 1; border: none; font-size: 20px; padding: 12px 0; outline: none; font-weight: 600; color: #0f172a; letter-spacing: 1px;">
+                    <i id="phoneCheckIcon" class="ti ti-circle-check" style="color: #cbd5e1; font-size: 24px;"></i>
                 </div>
                 
-                <div style="font-size: 13px; color: #64748b;">
-                    Resend OTP in <span style="color: #16a34a; font-weight: 700;">00:28</span>
-                </div>
-                
-                <div style="display: flex; gap: 12px; margin-top: 16px;">
-                    <div style="flex: 1; background: #f8fafc; border-radius: 12px; padding: 12px; text-align: center; border: 1px solid #f1f5f9;">
-                        <i class="ti ti-shield-check" style="color: #16a34a; font-size: 24px; margin-bottom: 4px;"></i>
-                        <div style="font-size: 12px; font-weight: 700; color: #0f172a;">Secure</div>
-                        <div style="font-size: 10px; color: #64748b; line-height: 1.2;">Bank-level<br>encryption</div>
-                    </div>
-                    <div style="flex: 1; background: #f8fafc; border-radius: 12px; padding: 12px; text-align: center; border: 1px solid #f1f5f9;">
-                        <i class="ti ti-bolt" style="color: #16a34a; font-size: 24px; margin-bottom: 4px;"></i>
-                        <div style="font-size: 12px; font-weight: 700; color: #0f172a;">Fast</div>
-                        <div style="font-size: 10px; color: #64748b; line-height: 1.2;">Quick & easy<br>login</div>
-                    </div>
-                    <div style="flex: 1; background: #f8fafc; border-radius: 12px; padding: 12px; text-align: center; border: 1px solid #f1f5f9;">
-                        <i class="ti ti-user" style="color: #16a34a; font-size: 24px; margin-bottom: 4px;"></i>
-                        <div style="font-size: 12px; font-weight: 700; color: #0f172a;">Private</div>
-                        <div style="font-size: 10px; color: #64748b; line-height: 1.2;">Your data is<br>always safe</div>
-                    </div>
-                </div>
-                
-                <button onclick="showToast('Login with Password coming soon')" style="width: 100%; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; background: white; color: #0f172a; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; margin-top: 8px;">
-                    <i class="ti ti-lock"></i> Login with Password
+                <button id="sendOtpBtn" disabled onclick="requestOTP()" style="width: 100%; padding: 18px; border-radius: 16px; border: none; background: #cbd5e1; color: white; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; cursor: not-allowed; transition: all 0.2s;">
+                    OTP bhejein <i class="ti ti-send"></i>
                 </button>
+                
+                <div style="text-align: center; font-size: 13px; color: #64748b; margin-top: 24px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <i class="ti ti-lock"></i> Hum aapka number surakshit rakhte hain
+                </div>
             </div>
             
         </div>
+        
+        <!-- STEP 3: OTP VERIFICATION SCREEN -->
+        <div id="loginStep3" style="display: none; flex-direction: column; height: 100%; background: white;">
+            
+            <div style="background: #0c8854; color: white; padding: 24px 24px 48px; position: relative;">
+                <i class="ti ti-arrow-left" style="font-size: 24px; cursor: pointer; margin-bottom: 24px; display: block;" onclick="document.getElementById('loginStep3').style.display='none'; document.getElementById('loginStep2').style.display='flex';"></i>
+                <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 8px;">OTP daalein</h2>
+                <p style="font-size: 14px; opacity: 0.9; margin: 0; line-height: 1.4;">Humne aapke number<br><strong id="displayPhoneOTP">+91 9142150520</strong> par OTP bheja hai <span style="color: #4ade80; cursor: pointer;" onclick="document.getElementById('loginStep3').style.display='none'; document.getElementById('loginStep2').style.display='flex';">Change</span></p>
+                <div class="scallop-edge"></div>
+            </div>
+            
+            <div style="padding: 32px 24px; display: flex; flex-direction: column; align-items: center; margin-top: 24px;">
+                <div style="width: 80px; height: 80px; background: #f0fdf4; border-radius: 24px; display: flex; align-items: center; justify-content: center; color: #16a34a; font-size: 40px; position: relative; margin-bottom: 32px;">
+                    <i class="ti ti-device-mobile-message"></i>
+                    <div style="position: absolute; bottom: -4px; right: -4px; width: 28px; height: 28px; background: #16a34a; border-radius: 50%; color: white; font-size: 16px; display: flex; align-items: center; justify-content: center; border: 3px solid white;"><i class="ti ti-lock"></i></div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; gap: 8px; width: 100%; margin-bottom: 24px;">
+                    <input type="tel" maxlength="1" class="otp-box" oninput="moveToNext(this, 'otp2')" onkeydown="handleBackspace(event, this, null)" id="otp1">
+                    <input type="tel" maxlength="1" class="otp-box" oninput="moveToNext(this, 'otp3', 'otp1')" onkeydown="handleBackspace(event, this, 'otp1')" id="otp2">
+                    <input type="tel" maxlength="1" class="otp-box" oninput="moveToNext(this, 'otp4', 'otp2')" onkeydown="handleBackspace(event, this, 'otp2')" id="otp3">
+                    <input type="tel" maxlength="1" class="otp-box" oninput="moveToNext(this, 'otp5', 'otp3')" onkeydown="handleBackspace(event, this, 'otp3')" id="otp4">
+                    <input type="tel" maxlength="1" class="otp-box" oninput="moveToNext(this, 'otp6', 'otp4')" onkeydown="handleBackspace(event, this, 'otp4')" id="otp5">
+                    <input type="tel" maxlength="1" class="otp-box" oninput="verifyOTP(this, 'otp5')" onkeydown="handleBackspace(event, this, 'otp5')" id="otp6">
+                </div>
+                
+                <div style="font-size: 14px; color: #64748b; margin-bottom: 32px;">
+                    Resend OTP in <span style="color: #10b981; font-weight: 700;">00:28</span>
+                </div>
+                
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; width: 100%; display: flex; gap: 16px; align-items: flex-start;">
+                    <div style="color: #f59e0b; font-size: 24px;"><i class="ti ti-bulb-filled"></i></div>
+                    <div>
+                        <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">Tip</div>
+                        <div style="font-size: 13px; color: #64748b; line-height: 1.4;">Aap roz app use karenge,<br>aapka Streak badhega! 🚀</div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+        
     </div>
 <div class="full-overlay" id="globalLoader" style="z-index: 9999 !important; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; flex-direction: column;">
         <div class="loader-spinner" style="width: 40px; height: 40px; border: 4px solid #fff; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>

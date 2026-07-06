@@ -12,31 +12,77 @@
         
         let pendingPhone = "";
         
-        function requestOTP() {
-            let phone = document.getElementById('loginPhoneInput').value.trim();
-            if (!phone || phone.length < 10) {
-                showToast("Please enter a valid 10-digit phone number");
-                return;
+        function validatePhone() {
+            let input = document.getElementById('loginPhoneInput');
+            let val = input.value.replace(/\D/g, ''); // only digits
+            input.value = val;
+            
+            let btn = document.getElementById('sendOtpBtn');
+            let icon = document.getElementById('phoneCheckIcon');
+            
+            if (val.length === 10) {
+                btn.disabled = false;
+                btn.style.background = '#0c8854';
+                btn.style.cursor = 'pointer';
+                icon.className = 'ti ti-circle-check-filled';
+                icon.style.color = '#10b981';
+            } else {
+                btn.disabled = true;
+                btn.style.background = '#cbd5e1';
+                btn.style.cursor = 'not-allowed';
+                icon.className = 'ti ti-circle-check';
+                icon.style.color = '#cbd5e1';
             }
-            pendingPhone = phone;
-            document.getElementById('displayPhoneOTP').innerText = "+91 " + phone;
-            document.getElementById('loginStep2').style.display = 'none';
-            document.getElementById('loginStep3').style.display = 'flex';
-            document.getElementById('otp1').focus();
+        }
+        
+        async function requestOTP() {
+            let phone = document.getElementById('loginPhoneInput').value.trim();
+            if (phone.length !== 10) return;
+            
+            document.getElementById('globalLoader').style.display = 'flex';
+            document.getElementById('globalLoaderText').innerText = 'Sending OTP...';
+            
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/auth/send-otp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: '+91' + phone })
+                });
+                let data = await res.json();
+                
+                if (data.status === 'SUCCESS') {
+                    showToast("OTP sent successfully");
+                    pendingPhone = '+91' + phone;
+                    document.getElementById('displayPhoneOTP').innerText = "+91 " + phone;
+                    document.getElementById('loginStep2').style.display = 'none';
+                    document.getElementById('loginStep3').style.display = 'flex';
+                    
+                    // Clear OTP fields
+                    for(let i=1; i<=6; i++) document.getElementById('otp' + i).value = '';
+                    
+                    setTimeout(() => { document.getElementById('otp1').focus(); }, 100);
+                } else {
+                    showToast("Failed to send OTP");
+                }
+            } catch (e) {
+                showToast("Network Error");
+            } finally {
+                document.getElementById('globalLoader').style.display = 'none';
+            }
+        }
+
+        function handleBackspace(e, current, prevFieldID) {
+            if (e.key === 'Backspace' && current.value.length === 0 && prevFieldID) {
+                document.getElementById(prevFieldID).focus();
+            }
         }
 
         function moveToNext(current, nextFieldID, prevFieldID) {
+            // Replace non digits
+            current.value = current.value.replace(/\D/g, '');
+            
             if (current.value.length >= 1 && nextFieldID) {
                 document.getElementById(nextFieldID).focus();
-            } else if (current.value.length === 0 && prevFieldID) {
-                document.getElementById(prevFieldID).focus();
-            }
-        }
-
-        function verifyOTP(current, prevFieldID) {
-            if (current.value.length === 0 && prevFieldID) {
-                document.getElementById(prevFieldID).focus();
-                return;
             }
             
             // Check if all 6 digits are entered
@@ -44,21 +90,31 @@
             for(let i=1; i<=6; i++) {
                 otp += document.getElementById('otp' + i).value;
             }
-            
             if (otp.length === 6) {
-                handleLogin(pendingPhone);
+                verifyOTPFinal(otp);
             }
         }
 
-        async function handleLogin(phone) {
+        function verifyOTP(current, prevFieldID) {
+            current.value = current.value.replace(/\D/g, '');
+            let otp = "";
+            for(let i=1; i<=6; i++) {
+                otp += document.getElementById('otp' + i).value;
+            }
+            if (otp.length === 6) {
+                verifyOTPFinal(otp);
+            }
+        }
+
+        async function verifyOTPFinal(otp) {
             document.getElementById('globalLoader').style.display = 'flex';
             document.getElementById('globalLoaderText').innerText = 'Verifying OTP...';
             
             try {
-                let res = await fetch(`${RENDER_API_URL}/api/auth/login`, {
+                let res = await fetch(`${RENDER_API_URL}/api/auth/verify-otp`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ identifier: phone })
+                    body: JSON.stringify({ phone: pendingPhone, otp: otp })
                 });
                 let data = await res.json();
                 
@@ -71,10 +127,10 @@
                         MERCHANT_ID = data.merchant_id;
                         MERCHANT_ROLE = 'merchant';
                         document.getElementById('splashLoginOverlay').style.display = 'none';
-                        await initializeApp();
+                        initShopSathi();
                     }
                 } else {
-                    showToast("Login failed");
+                    showToast("Wrong OTP");
                 }
             } catch (e) {
                 console.error("Login Error:", e);
@@ -4246,7 +4302,27 @@
             }).catch(e => console.warn(e));
         }
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initShopSathi);
+            document.addEventListener('DOMContentLoaded', bootApp);
         } else {
-            initShopSathi();
+            bootApp();
+        }
+        
+        function bootApp() {
+            if (MERCHANT_ROLE === 'admin') {
+                window.location.href = 'admin.html';
+            } else if (MERCHANT_ID) {
+                // Logged in as merchant
+                document.getElementById('splashLoginOverlay').style.display = 'none';
+                initShopSathi();
+                
+                // Track login to update streak on reload
+                fetch(`${RENDER_API_URL}/api/usage/track`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ merchant_id: MERCHANT_ID, action: 'login' })
+                }).catch(e => console.error("Streak tracking error on load", e));
+            } else {
+                // Show login overlay
+                document.getElementById('splashLoginOverlay').style.display = 'flex';
+            }
         }

@@ -10,12 +10,27 @@ router = APIRouter()
 ADMIN_PHONES = ['+919142150520', '9142150520']
 ADMIN_EMAILS = ['saurabh24@iitk.ac.in']
 
-class LoginRequest(BaseModel):
-    identifier: str # phone or email
 
-@router.post("/login")
-def login(req: LoginRequest):
-    identifier = req.identifier.strip()
+class OTPRequest(BaseModel):
+    phone: str
+
+@router.post("/send-otp")
+def send_otp(req: OTPRequest):
+    phone = req.phone.strip()
+    if len(phone) < 10:
+        return {"status": "ERROR", "message": "Invalid phone number"}
+    # In a real app, integrate MSG91 or Twilio here.
+    return {"status": "SUCCESS", "message": "OTP sent successfully"}
+
+class VerifyOTPRequest(BaseModel):
+    phone: str
+    otp: str
+
+@router.post("/verify-otp")
+def verify_otp(req: VerifyOTPRequest):
+    identifier = req.phone.strip()
+    
+    # In a real app, verify OTP from Redis/DB here.
     
     # Check Admin
     if identifier in ADMIN_PHONES or identifier in ADMIN_EMAILS:
@@ -43,4 +58,4 @@ def login(req: LoginRequest):
             )
             conn.commit()
             
-    return {"status": "SUCCESS", "role": "merchant", "merchant_id": m_id}
+    return {"status": "SUCCESS", "role": "merchant", "merchant_id": m_id, "id": m_id, "name": "Merchant", "phone": identifier}
