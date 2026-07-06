@@ -5,7 +5,7 @@
             console.error("App Error: " + message + " at line " + lineno);
             return true;
         };
-        const RENDER_API_URL = "https://ok-credit.onrender.com";
+        const RENDER_API_URL = "http://127.0.0.1:8000";
         let MERCHANT_ID = localStorage.getItem('shopsathi_merchant_id') || "";
         let MERCHANT_ROLE = localStorage.getItem('shopsathi_role') || "";
         
