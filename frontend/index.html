@@ -727,12 +727,7 @@
             </div>
             <div class="main-content">
 
-                <div class="streak-card" id="homeStreakCard" style="background: white; border-radius: 16px; padding: 16px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <div id="homeStreakTitle" style="font-size: 13px; font-weight: 700; color: var(--ink-muted); margin-bottom: 4px;">Your Daily Streak</div>
-                        <div id="homeStreakDays" style="font-size: 24px; font-weight: 800; color: var(--ink-main);">0 Days</div>
-                        <div style="font-size: 12px; font-weight: 600; color: var(--primary); margin-top: 2px;">Keep it up! 🚀</div>
-                    </div>
+                
                     
                 </div>
 
@@ -1024,7 +1019,19 @@
             </div>
 
             <div class="drawer-section">
-                <div class="drawer-sec-title">Today's Overview</div>
+                
+            <div class="drawer-section">
+                <div class="drawer-sec-title">Your Activity & Streak</div>
+                <div style="background: linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%); border-radius: 16px; padding: 16px; border: 1px solid #a7f3d0; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <div style="font-size: 12px; font-weight: 700; color: #047857; margin-bottom: 4px;">Current Streak</div>
+                        <div id="drawerStreakDays" style="font-size: 24px; font-weight: 800; color: #065f46;">0 Days 🔥</div>
+                        <div style="font-size: 11px; font-weight: 600; color: #059669; margin-top: 2px;">Consistency is key!</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="drawer-sec-title">Today's Overview</div>
                 <div class="drawer-stats-box">
                     <div class="ds-row">
                         <span>Voice Entries</span>
@@ -1060,7 +1067,7 @@
                     <div class="dmi-icon"><i class="ti ti-headset"></i></div>
                     <div class="dmi-text">Help & Support</div>
                 </div>
-                <div class="drawer-menu-item" style="color: var(--red);">
+                <div class="drawer-menu-item" style="color: var(--red); cursor: pointer;" onclick="logoutMerchant()">
                     <div class="dmi-icon"><i class="ti ti-logout"></i></div>
                     <div class="dmi-text">Logout</div>
                 </div>

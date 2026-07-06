@@ -136,7 +136,7 @@ body { background: var(--bg-main); color: var(--text-main); }
         z-index: 999;
         transition: 0.3s ease-in-out;
     }
-    .sidebar.open { left: 0; }
+    .sidebar.open { left: 0; box-shadow: 2px 0 12px rgba(0,0,0,0.5); }
     
     .mobile-menu-btn { display: block; }
     
@@ -147,4 +147,26 @@ body { background: var(--bg-main); color: var(--text-main); }
     
     .table-card { overflow-x: auto; }
     .merchant-table { min-width: 800px; }
+}
+
+/* Overlay */
+.sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 998;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.sidebar-overlay.show {
+    display: block;
+    opacity: 1;
+}
+
+/* Fix mobile scroll blocking */
+.main-content {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
