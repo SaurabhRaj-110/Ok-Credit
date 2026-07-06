@@ -4091,18 +4091,7 @@
         function initShopSathi() {
             if (window.location.protocol === 'file:') {
                 document.getElementById('fileProtocolWarning').style.display = 'block';
-            
-            // Fetch usage data for drawer streak
-            fetch(`${RENDER_API_URL}/api/usage/${MERCHANT_ID}`)
-                .then(r => r.json())
-                .then(data => {
-                    if(data.status === 'SUCCESS' && data.data) {
-                        const el = document.getElementById('drawerStreakDays');
-                        if(el) el.innerText = `${data.data.current_streak} Days 🔥`;
-                    }
-                })
-                .catch(e => console.error("Error fetching usage data", e));
-}
+            }
             syncDataFromCloud();
             renderUI();
             setTimeout(checkDueOrders, 1000);
