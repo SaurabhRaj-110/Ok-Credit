@@ -3362,3 +3362,20 @@
             top: 12px;
             right: 12px;
         }
+.otp-box {
+    width: 100%;
+    aspect-ratio: 1;
+    max-width: 50px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    color: #0f172a;
+    outline: none;
+    transition: all 0.2s;
+}
+.otp-box:focus {
+    border-color: #16a34a;
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+}

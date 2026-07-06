@@ -57,7 +57,20 @@ def track_usage(req: TrackRequest):
                 except:
                     pass
                     
-            if last_login_date != today_date:
+            if current_streak == 0:
+                current_streak = 1
+                total_days += 1
+                updates.append("current_streak = ?")
+                params.append(current_streak)
+                updates.append("total_login_days = ?")
+                params.append(total_days)
+                updates.append("last_login = ?")
+                params.append(now_str)
+                if current_streak > highest_streak:
+                    highest_streak = current_streak
+                    updates.append("highest_streak = ?")
+                    params.append(highest_streak)
+            elif last_login_date != today_date:
                 total_days += 1
                 
                 # Check if consecutive

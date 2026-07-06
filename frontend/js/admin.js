@@ -1,4 +1,9 @@
 
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    sidebar.classList.toggle('open');
+}
+
 const RENDER_API_URL = ''; // using relative or setup via env
 
 function logoutAdmin() {

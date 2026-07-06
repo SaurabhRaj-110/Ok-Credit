@@ -9,15 +9,50 @@
         let MERCHANT_ID = localStorage.getItem('shopsathi_merchant_id') || "";
         let MERCHANT_ROLE = localStorage.getItem('shopsathi_role') || "";
         
-        async function handleLogin() {
+        
+        let pendingPhone = "";
+        
+        function requestOTP() {
             let phone = document.getElementById('loginPhoneInput').value.trim();
-            if (!phone) {
-                showToast("Please enter a valid phone number");
+            if (!phone || phone.length < 10) {
+                showToast("Please enter a valid 10-digit phone number");
+                return;
+            }
+            pendingPhone = phone;
+            document.getElementById('displayPhoneOTP').innerText = "+91 " + phone;
+            document.getElementById('loginStep2').style.display = 'none';
+            document.getElementById('loginStep3').style.display = 'flex';
+            document.getElementById('otp1').focus();
+        }
+
+        function moveToNext(current, nextFieldID, prevFieldID) {
+            if (current.value.length >= 1 && nextFieldID) {
+                document.getElementById(nextFieldID).focus();
+            } else if (current.value.length === 0 && prevFieldID) {
+                document.getElementById(prevFieldID).focus();
+            }
+        }
+
+        function verifyOTP(current, prevFieldID) {
+            if (current.value.length === 0 && prevFieldID) {
+                document.getElementById(prevFieldID).focus();
                 return;
             }
             
+            // Check if all 6 digits are entered
+            let otp = "";
+            for(let i=1; i<=6; i++) {
+                otp += document.getElementById('otp' + i).value;
+            }
+            
+            if (otp.length === 6) {
+                handleLogin(pendingPhone);
+            }
+        }
+
+        async function handleLogin(phone) {
             document.getElementById('globalLoader').style.display = 'flex';
-            document.getElementById('globalLoaderText').innerText = 'Verifying...';
+            document.getElementById('globalLoaderText').innerText = 'Verifying OTP...';
             
             try {
                 let res = await fetch(`${RENDER_API_URL}/api/auth/login`, {
