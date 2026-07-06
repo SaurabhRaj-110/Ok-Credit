@@ -4319,6 +4319,15 @@
         }
         
         function bootApp() {
+            // Force login flow on new tab/window for demo purposes
+            if (!sessionStorage.getItem('session_started')) {
+                localStorage.removeItem('shopsathi_merchant_id');
+                localStorage.removeItem('shopsathi_role');
+                MERCHANT_ID = "";
+                MERCHANT_ROLE = "";
+                sessionStorage.setItem('session_started', 'true');
+            }
+
             if (!MERCHANT_ID) {
                 document.getElementById('splashLoginOverlay').style.display = 'flex';
                 return;
