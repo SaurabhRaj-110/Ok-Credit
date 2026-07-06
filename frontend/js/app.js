@@ -4104,6 +4104,17 @@
             
             // Setup periodic polling for notifications
             setInterval(fetchNotifications, 60000); // Check every minute
+            
+            // Fetch usage data for drawer streak
+            fetch(`${RENDER_API_URL}/api/usage/${MERCHANT_ID}`)
+                .then(r => r.json())
+                .then(data => {
+                    if(data.status === 'SUCCESS' && data.data) {
+                        const el = document.getElementById('drawerStreakDays');
+                        if(el) el.innerText = `${data.data.current_streak} Days 🔥`;
+                    }
+                })
+                .catch(e => console.error("Error fetching usage data", e));
         }
         
         // ==========================================
@@ -4308,21 +4319,27 @@
         }
         
         function bootApp() {
+            if (!MERCHANT_ID) {
+                document.getElementById('splashLoginOverlay').style.display = 'flex';
+                return;
+            }
             if (MERCHANT_ROLE === 'admin') {
                 window.location.href = 'admin.html';
-            } else if (MERCHANT_ID) {
-                // Logged in as merchant
-                document.getElementById('splashLoginOverlay').style.display = 'none';
-                initShopSathi();
-                
-                // Track login to update streak on reload
-                fetch(`${RENDER_API_URL}/api/usage/track`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ merchant_id: MERCHANT_ID, action: 'login' })
-                }).catch(e => console.error("Streak tracking error on load", e));
-            } else {
-                // Show login overlay
-                document.getElementById('splashLoginOverlay').style.display = 'flex';
+                return;
             }
+            // Logged in as merchant
+            document.getElementById('splashLoginOverlay').style.display = 'none';
+            initShopSathi();
+            
+            // Track login to update streak on reload
+            fetch(`${RENDER_API_URL}/api/usage/track`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ merchant_id: MERCHANT_ID, action: 'login' })
+            }).catch(e => console.error("Streak tracking error on load", e));
+        }
+        
+        function logoutMerchant() {
+            localStorage.clear();
+            window.location.reload();
         }
