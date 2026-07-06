@@ -1512,7 +1512,25 @@
         function showMultiVoiceConfirm(preview) {
             closeVoiceEntryModal();
             let overlay = document.getElementById('multiVoiceConfirmOverlay');
-            if (!overlay) return;
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'modal-overlay';
+                overlay.id = 'multiVoiceConfirmOverlay';
+                overlay.style.zIndex = '9600';
+                overlay.innerHTML = `
+                    <div class="modal-content" style="max-height:85vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+                        <div style="padding:16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+                            <h3 style="margin:0; font-size:18px;">Review AI Transactions</h3>
+                            <div onclick="closeMultiVoiceConfirm()" style="padding:8px; cursor:pointer;"><i class="ti ti-x" style="font-size:20px;"></i></div>
+                        </div>
+                        <div id="mvc-list" style="flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px;"></div>
+                        <div style="padding:16px; border-top:1px solid var(--border); background:var(--bg-light);">
+                            <button id="mvc-confirm-btn" class="btn-primary" style="width:100%;">Confirm & Save</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+            }
             overlay.style.display = 'flex';
 
             let listContainer = document.getElementById('mvc-list');
