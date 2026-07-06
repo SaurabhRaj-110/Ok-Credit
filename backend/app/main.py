@@ -12,6 +12,9 @@ from app.routes import sales
 from app.routes import notifications
 from app.routes import stats
 from app.routes import evidence
+from app.routes import auth
+from app.routes import usage
+from app.routes import admin
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ShopSathiCore")
 
@@ -33,6 +36,9 @@ app.include_router(sales.router, prefix="/api/sales", tags=["Daily Sales"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(stats.router, prefix="/api/stats", tags=["Stats"])
 app.include_router(evidence.router, prefix="/api/evidence", tags=["Evidence"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(usage.router, prefix="/api/usage", tags=["Usage Tracking"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin Dashboard"])
 
 # Mount uploads directory for images
 import os
@@ -150,6 +156,31 @@ def materialize_tables():
                 reference_type TEXT,
                 is_read INTEGER DEFAULT 0,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(merchant_id) REFERENCES merchants(merchant_id)
+            );
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS merchant_usage (
+                merchant_id TEXT PRIMARY KEY,
+                merchant_name TEXT,
+                role TEXT DEFAULT 'merchant',
+                current_streak INTEGER DEFAULT 0,
+                highest_streak INTEGER DEFAULT 0,
+                last_login TEXT,
+                first_login TEXT,
+                total_login_days INTEGER DEFAULT 0,
+                total_sessions INTEGER DEFAULT 0,
+                session_duration INTEGER DEFAULT 0,
+                voice_commands INTEGER DEFAULT 0,
+                ocr_scans INTEGER DEFAULT 0,
+                sales_entries INTEGER DEFAULT 0,
+                stock_updates INTEGER DEFAULT 0,
+                khata_updates INTEGER DEFAULT 0,
+                notifications_seen INTEGER DEFAULT 0,
+                last_active TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(merchant_id) REFERENCES merchants(merchant_id)
             );
         """)

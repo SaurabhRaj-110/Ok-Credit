@@ -6,7 +6,81 @@
             return true;
         };
         const RENDER_API_URL = "https://ok-credit.onrender.com";
-        const MERCHANT_ID = "m-101";
+        let MERCHANT_ID = localStorage.getItem('shopsathi_merchant_id') || "";
+        let MERCHANT_ROLE = localStorage.getItem('shopsathi_role') || "";
+        
+        async function handleLogin() {
+            let phone = document.getElementById('loginPhoneInput').value.trim();
+            if (!phone) {
+                showToast("Please enter a valid phone number");
+                return;
+            }
+            
+            document.getElementById('globalLoader').style.display = 'flex';
+            document.getElementById('globalLoaderText').innerText = 'Verifying...';
+            
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identifier: phone })
+                });
+                let data = await res.json();
+                
+                if (data.status === 'SUCCESS') {
+                    localStorage.setItem('shopsathi_role', data.role);
+                    if (data.role === 'admin') {
+                        window.location.href = 'admin.html';
+                    } else {
+                        localStorage.setItem('shopsathi_merchant_id', data.merchant_id);
+                        MERCHANT_ID = data.merchant_id;
+                        MERCHANT_ROLE = 'merchant';
+                        document.getElementById('splashLoginOverlay').style.display = 'none';
+                        await initializeApp();
+                    }
+                } else {
+                    showToast("Login failed");
+                }
+            } catch (e) {
+                console.error("Login Error:", e);
+                showToast("Network Error: Could not login");
+            } finally {
+                document.getElementById('globalLoader').style.display = 'none';
+            }
+        }
+        
+        async function trackUsage(action) {
+            if (!MERCHANT_ID || MERCHANT_ROLE === 'admin') return;
+            try {
+                let res = await fetch(`${RENDER_API_URL}/api/usage/track`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ merchant_id: MERCHANT_ID, action: action })
+                });
+                let data = await res.json();
+                if (data.status === 'SUCCESS') {
+                    if (action === 'login') {
+                        // Update UI with streak
+                        let streakCard = document.getElementById('homeStreakCard');
+                        if (streakCard) {
+                            document.getElementById('homeStreakDays').innerText = `${data.current_streak} Days`;
+                            document.getElementById('menuStreakBadge').innerText = `${data.current_streak} Days`;
+                            
+                            // Badges
+                            let title = "Starter";
+                            if (data.current_streak >= 90) title = "Champion 👑";
+                            else if (data.current_streak >= 30) title = "Power Merchant 💎";
+                            else if (data.current_streak >= 15) title = "Smart Merchant 🏅";
+                            else if (data.current_streak >= 7) title = "Consistent 🎯";
+                            document.getElementById('homeStreakTitle').innerHTML = `Your Daily Streak • <span style="color:var(--primary);">${title}</span>`;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Usage tracking failed", e);
+            }
+        }
+        
         const VOICE_AI_TIMEOUT_MS = 7000;
         const SafeStorage = {
             get: function(key) {
@@ -2247,7 +2321,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ merchant_id: MERCHANT_ID, item, qty, amount: amt })
                 });
-                showToast("Sale Updated");
+                showToast("Sale Updated"); trackUsage('sale');
                 await syncDataFromCloud();
             } catch (e) {
                 console.error("Sale update error", e);

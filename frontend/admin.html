@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShopSaathi AI - Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-icon"><i class="ti ti-building-store"></i></div>
+                <div class="logo-text">
+                    <div class="logo-title">ShopSaathi AI</div>
+                    <div class="logo-sub">Admin Panel</div>
+                </div>
+            </div>
+            
+            <div class="nav-menu">
+                <a href="#" class="nav-item active"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
+                <a href="#" class="nav-item"><i class="ti ti-users"></i> Merchants</a>
+                <a href="#" class="nav-item"><i class="ti ti-chart-bar"></i> Usage Analytics</a>
+                <a href="#" class="nav-item"><i class="ti ti-flame"></i> Streaks</a>
+                <a href="#" class="nav-item"><i class="ti ti-receipt"></i> Transactions</a>
+                <a href="#" class="nav-item"><i class="ti ti-scan"></i> Bills (OCR)</a>
+                <a href="#" class="nav-item"><i class="ti ti-microphone"></i> Voice Commands</a>
+                <a href="#" class="nav-item"><i class="ti ti-box"></i> Inventory</a>
+                <a href="#" class="nav-item"><i class="ti ti-file-analytics"></i> Reports</a>
+                <a href="#" class="nav-item"><i class="ti ti-bell"></i> Alerts</a>
+                <a href="#" class="nav-item"><i class="ti ti-settings"></i> Settings</a>
+            </div>
+            
+            <div class="live-users-card">
+                <div class="lu-header">
+                    <span>Live Users</span>
+                    <span class="lu-dot"></span> <span id="currentOnlineCount">0</span>
+                </div>
+                <div class="lu-sub">Online Right Now</div>
+                <canvas id="liveChart" width="100" height="40" style="margin-top:10px;"></canvas>
+            </div>
+            
+            <div class="admin-profile" onclick="logoutAdmin()">
+                <div class="ap-avatar"><img src="https://ui-avatars.com/api/?name=Admin&background=0D8ABC&color=fff" style="width:100%; border-radius:50%;"></div>
+                <div class="ap-info">
+                    <div class="ap-name">Admin</div>
+                    <div class="ap-role">Super Admin</div>
+                </div>
+                <i class="ti ti-chevron-down"></i>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="top-bar">
+                <h1>Dashboard Overview</h1>
+                <div class="date-picker">
+                    <i class="ti ti-calendar"></i> 
+                    <span id="currentDateDisplay">5 July 2026</span> 
+                    <i class="ti ti-chevron-down"></i>
+                </div>
+            </div>
+            
+            <!-- KPIs -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-title"><i class="ti ti-users" style="color:var(--primary);"></i> Total Merchants</div>
+                    <div class="kpi-value" id="kpiTotalMerchants">0</div>
+                    <div class="kpi-change positive">+2 this month</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-title"><i class="ti ti-user-check" style="color:#10b981;"></i> Today's Active</div>
+                    <div class="kpi-value" id="kpiActiveToday">0</div>
+                    <div class="kpi-change">61% of total</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-title"><i class="ti ti-activity" style="color:#3b82f6;"></i> Current Online</div>
+                    <div class="kpi-value" id="kpiOnline">0</div>
+                    <div class="kpi-change">Live right now</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-title"><i class="ti ti-flame" style="color:#f97316;"></i> Avg. Streak</div>
+                    <div class="kpi-value" id="kpiAvgStreak">0 Days</div>
+                    <div class="kpi-change">Across all merchants</div>
+                </div>
+                
+                <div class="kpi-card" style="grid-column: span 1.5;">
+                    <div class="kpi-title"><i class="ti ti-receipt" style="color:#8b5cf6;"></i> Total Transactions</div>
+                    <div class="kpi-value" id="kpiTxn">0</div>
+                    <div class="kpi-change positive">+18% vs last month</div>
+                </div>
+                <div class="kpi-card" style="grid-column: span 1.5;">
+                    <div class="kpi-title"><i class="ti ti-scan" style="color:#ec4899;"></i> Bills Processed (OCR)</div>
+                    <div class="kpi-value" id="kpiOcr">0</div>
+                    <div class="kpi-change positive">+24% vs last month</div>
+                </div>
+                <div class="kpi-card" style="grid-column: span 1.5;">
+                    <div class="kpi-title"><i class="ti ti-microphone" style="color:#0ea5e9;"></i> Voice Commands</div>
+                    <div class="kpi-value" id="kpiVoice">0</div>
+                    <div class="kpi-change positive">+21% vs last month</div>
+                </div>
+                <div class="kpi-card" style="grid-column: span 1.5;">
+                    <div class="kpi-title">AI Accuracy (Avg.)</div>
+                    <div style="display:flex; gap:16px; margin-top:8px;">
+                        <div style="text-align:center;">
+                            <div style="font-size:10px; color:#64748b; margin-bottom:4px;">OCR</div>
+                            <div style="width:40px; height:40px; border-radius:50%; border:3px solid #10b981; display:flex; align-items:center; justify-content:center; font-weight:700; color:#10b981; font-size:12px;" id="accOcr">91%</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:10px; color:#64748b; margin-bottom:4px;">Voice</div>
+                            <div style="width:40px; height:40px; border-radius:50%; border:3px solid #8b5cf6; display:flex; align-items:center; justify-content:center; font-weight:700; color:#8b5cf6; font-size:12px;" id="accVoice">94%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="cc-header">Daily Active Merchants <span class="cc-sub">(This Week)</span></div>
+                    <div class="cc-body"><canvas id="damChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="cc-header">Retention <span class="cc-sub">(Cohort Analysis)</span></div>
+                    <div class="cc-body"><canvas id="retentionChart"></canvas></div>
+                </div>
+            </div>
+            
+            <!-- Table -->
+            <div class="table-card">
+                <div class="tc-header">
+                    <h2>Top Merchants <span style="font-size:14px; font-weight:500; color:#64748b;">(By Streak)</span></h2>
+                    <a href="#" style="font-size:14px; font-weight:600; color:var(--primary); text-decoration:none;">View All</a>
+                </div>
+                <table class="merchant-table">
+                    <thead>
+                        <tr>
+                            <th>Merchant Name</th>
+                            <th>Current Streak</th>
+                            <th>Highest Streak</th>
+                            <th>Last Active</th>
+                            <th>Total Sessions</th>
+                            <th>Transactions</th>
+                            <th>Status</th>
+                            <th>Adoption</th>
+                        </tr>
+                    </thead>
+                    <tbody id="merchantTableBody">
+                        <!-- Filled by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/admin.js"></script>
+</body>
+</html>

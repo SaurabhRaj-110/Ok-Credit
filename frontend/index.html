@@ -11,6 +11,32 @@
 </head>
 
 <body>
+
+    <!-- SPLASH & LOGIN OVERLAY -->
+    <div id="splashLoginOverlay" style="position: fixed; inset: 0; background: var(--primary-dark); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white;">
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); margin-bottom: 24px;">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+            </div>
+            <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">ShopSaathi AI</h1>
+            <p style="font-size: 16px; opacity: 0.9; text-align: center; margin: 0; line-height: 1.4;">Aapka AI Saathi, Har Kaam<br>Asaan Banaye</p>
+        </div>
+        
+        <div style="width: 100%; padding: 32px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; align-items: center; background: rgba(255,255,255,0.1); border-radius: 12px; padding: 4px 16px;">
+                <span style="font-size: 16px; font-weight: 600; border-right: 1px solid rgba(255,255,255,0.3); padding-right: 12px; margin-right: 12px;">+91</span>
+                <input type="tel" id="loginPhoneInput" placeholder="Enter mobile number" style="flex: 1; background: transparent; border: none; color: white; font-size: 18px; padding: 12px 0; outline: none; font-weight: 500;">
+            </div>
+            <button onclick="handleLogin()" style="width: 100%; padding: 16px; border-radius: 12px; border: none; background: white; color: var(--primary-dark); font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                Continue with Phone <i class="ti ti-arrow-right"></i>
+            </button>
+            <div style="text-align: center; font-size: 12px; opacity: 0.6; margin-top: 16px;">v1.0.0 (Beta)</div>
+        </div>
+    </div>
+
     <div class="full-overlay" id="globalLoader" style="z-index: 9999 !important; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; flex-direction: column;">
         <div class="loader-spinner" style="width: 40px; height: 40px; border: 4px solid #fff; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
         <div style="color: white; margin-top: 16px; font-weight: 700; font-size: 14px;" id="globalLoaderText">Processing...</div>
@@ -589,6 +615,16 @@
                 <div class="location-pin"><i class="ti ti-map-pin" style="font-size:14px;"></i> Nalanda, Bihar</div>
             </div>
             <div class="main-content">
+                
+                <div class="streak-card" id="homeStreakCard" style="background: white; border-radius: 16px; padding: 16px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <div id="homeStreakTitle" style="font-size: 13px; font-weight: 700; color: var(--ink-muted); margin-bottom: 4px;">Your Daily Streak</div>
+                        <div id="homeStreakDays" style="font-size: 24px; font-weight: 800; color: var(--ink-main);">0 Days</div>
+                        <div style="font-size: 12px; font-weight: 600; color: var(--primary); margin-top: 2px;">Keep it up! 🚀</div>
+                    </div>
+                    <div style="font-size: 40px;">🔥</div>
+                </div>
+
                 <div class="summary-card">
                     <div class="summary-header">Summary • <span style="color:var(--ink-muted);" id="header-date">09 June, 2026</span><span style="float:right;">Report <i class="ti ti-chevron-right" style="font-size:10px;"></i></span></div>
                     <div class="dash-grid">
