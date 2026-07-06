@@ -17,6 +17,30 @@ class GroqEngine:
             
         self.client = Groq(api_key=api_key)
         self.model = "llama-3.3-70b-versatile"
+        self.whisper_model = "whisper-large-v3"
+
+    def transcribe_audio(self, file_path: str) -> str:
+        """
+        Uses Groq Whisper API to transcribe Hindi/Hinglish audio accurately.
+        """
+        try:
+            with open(file_path, "rb") as file:
+                transcription = self.client.audio.transcriptions.create(
+                    file=(file_path, file.read()),
+                    model=self.whisper_model,
+                    response_format="text",
+                    language="hi"
+                )
+            # Remove common filler words
+            text = transcription.strip()
+            fillers = ["haan", "acha", "matlab", "sun", "ek minute", "hmmm", "uh", "um", "theek hai"]
+            for filler in fillers:
+                text = text.replace(filler, "")
+            
+            return text.strip()
+        except Exception as e:
+            logger.error(f"Whisper Transcription failed: {e}")
+            raise e
 
     def extract_intent(self, text: str) -> dict:
         prompt = f"""
@@ -24,27 +48,22 @@ class GroqEngine:
         Extract the intent from this text: "{text}"
         
         CRITICAL RULES:
-        1. "CUSTOMER_PAYMENT": Customer paid money (e.g., Advance, Jama kiya, de diya, account clear, jama kar lo). This subtracts from their balance.
-        2. "CUSTOMER_CREDIT": Customer took items on Udhaar/baaki (e.g., udhaar likh do, baki hai, baaki). This adds to their balance.
-        3. "SUPPLIER_PAYMENT": Shopkeeper paid money to supplier/distributor (e.g., supplier ko paise de diye, payment kar diya). Subtracts from supplier balance.
-        4. "SUPPLIER_CREDIT": Shopkeeper took maal on credit from supplier, OR owes money to supplier (e.g., supplier ka baki likh do, supplier ko dene hain). Adds to supplier balance.
+        1. "CUSTOMER_PAYMENT": Customer paid money. (Subtracts from their balance).
+        2. "CUSTOMER_CREDIT": Customer took items on Udhaar/baaki. (Adds to their balance).
+        3. "SUPPLIER_PAYMENT": Shopkeeper paid money to supplier/distributor. (Subtracts from supplier balance).
+        4. "SUPPLIER_CREDIT": Shopkeeper took maal on credit from supplier. (Adds to supplier balance).
         5. "ADD_STOCK" / "REDUCE_STOCK": For inventory changes. DO NOT confuse people's names with stock items.
-        6. "NAVIGATE_STOCK" / "NAVIGATE_KHATA" / "NAVIGATE_SNAP": Use these if the user wants to navigate to a section.
-        7. For names of items or people, ALWAYS transliterate Hindi/regional words into English script (e.g., "सौरभ राज" -> "Saurabh Raj"). Do NOT return text in Devanagari.
-        8. If command contains "supplier", "distributor", "wholesaler", "vendor", "company" -> ALWAYS classify as SUPPLIER_PAYMENT or SUPPLIER_CREDIT, and return "party_type": "SUPPLIER".
-        9. If command contains "customer", "grahak", "uncle", "bhaiya", or just a person's name -> ALWAYS classify as CUSTOMER_PAYMENT or CUSTOMER_CREDIT, and return "party_type": "CUSTOMER".
-        10. Pay close attention to multiple commands for different parties in the same sentence. 
-           Example: "सलोनी के खाते में 2000 एडवांस और सौरव राज के खाते में 200 रुपए उधार लिख दो" 
-           MUST return TWO actions: 
-           - {{"action": "CUSTOMER_PAYMENT", "target_name": "Saloni", "party_type": "CUSTOMER", "amount": 2000}}
-           - {{"action": "CUSTOMER_CREDIT", "target_name": "Saurabh Raj", "party_type": "CUSTOMER", "amount": 200}}
+        6. "GENERATE_BILL": If the user says "bill banana hai", "bill bana do", "receipt bana do", "invoice generate karo".
+        7. For names, ALWAYS transliterate Hindi/regional words into English script (e.g., "सौरभ राज" -> "Saurabh Raj").
+        8. If command contains "supplier", "distributor", "vendor", "company" -> classify as SUPPLIER_PAYMENT or SUPPLIER_CREDIT.
+        9. If command contains "customer", "grahak", "uncle", "bhaiya", or just a person's name -> classify as CUSTOMER_PAYMENT or CUSTOMER_CREDIT.
+        10. Pay close attention to multiple commands. Example: "5 packet maggi becha aur rahul ne 50 rupaye diye" -> Return two actions.
 
-        The user may speak multiple commands at once (e.g., "5 packet maggi becha aur rahul ne 50 rupaye diye").
         Return a JSON object with an 'actions' key containing an array of objects representing each action:
         {{
           "actions": [
             {{
-                "action": "CUSTOMER_PAYMENT" | "CUSTOMER_CREDIT" | "SUPPLIER_PAYMENT" | "SUPPLIER_CREDIT" | "ADD_STOCK" | "REDUCE_STOCK" | "NAVIGATE_STOCK" | "NAVIGATE_KHATA" | "NAVIGATE_SNAP" | "UNKNOWN",
+                "action": "CUSTOMER_PAYMENT" | "CUSTOMER_CREDIT" | "SUPPLIER_PAYMENT" | "SUPPLIER_CREDIT" | "ADD_STOCK" | "REDUCE_STOCK" | "GENERATE_BILL" | "UNKNOWN",
                 "item_name": string or null,
                 "quantity": float or null,
                 "unit": string or null,
@@ -70,19 +89,17 @@ class GroqEngine:
                 ],
                 model=self.model,
                 temperature=0,
-                response_format={"type": "json_object"} # We will actually ask it to return a json object with an 'actions' array to be safe since groq json mode requires an object.
+                response_format={"type": "json_object"}
             )
             raw_text = response.choices[0].message.content.strip()
             logger.info(f"Groq AI Extraction raw: {raw_text}")
             
             parsed = json.loads(raw_text)
             
-            # Since JSON mode requires an object, if the model returned an object with a key (like {"actions": [...]}) we extract it.
             if isinstance(parsed, dict):
                 for key in parsed:
                     if isinstance(parsed[key], list):
                         return parsed[key]
-                # If it's a single object that matches the schema, wrap it in a list
                 if "action" in parsed:
                     return [parsed]
             
