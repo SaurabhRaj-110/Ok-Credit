@@ -15,6 +15,19 @@
         function validatePhone() {
             let input = document.getElementById('loginPhoneInput');
             let val = input.value.replace(/\D/g, ''); // only digits
+            
+            // Handle +91 pasting (where +91 is already included in HTML so we strip it)
+            if (val.length >= 12 && val.startsWith('91')) {
+                val = val.substring(2);
+            } else if (val.length >= 11 && val.startsWith('0')) {
+                val = val.substring(1);
+            }
+            
+            // Enforce max 10 digits
+            if (val.length > 10) {
+                val = val.substring(0, 10);
+            }
+            
             input.value = val;
             
             let btn = document.getElementById('sendOtpBtn');
@@ -42,6 +55,11 @@
             document.getElementById('globalLoader').style.display = 'flex';
             document.getElementById('globalLoaderText').innerText = 'Sending OTP...';
             
+            let longWaitMsg = setTimeout(() => {
+                let loader = document.getElementById('globalLoaderText');
+                if(loader) loader.innerHTML = 'Sending OTP...<br><span style="font-size:11px;opacity:0.8;font-weight:normal;">(First login takes ~40s, please wait...)</span>';
+            }, 6000);
+            
             try {
                 let res = await fetch(`${RENDER_API_URL}/api/auth/send-otp`, {
                     method: 'POST',
@@ -67,6 +85,7 @@
             } catch (e) {
                 showToast("Network Error");
             } finally {
+                if(typeof longWaitMsg !== 'undefined') clearTimeout(longWaitMsg);
                 document.getElementById('globalLoader').style.display = 'none';
             }
         }
