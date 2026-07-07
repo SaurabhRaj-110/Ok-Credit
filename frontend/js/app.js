@@ -1572,10 +1572,10 @@
                     let stHtml = `
                         <div class="mvc-item-title">${act.item_name} ${act.is_new ? '<span style="color:var(--primary);font-size:10px;">(NEW)</span>' : ''}</div>
                         <div class="mvc-item-sub">
-                           ${act.is_sale ? 'Sale' : 'Purchase'} | Qty: ${act.qty} ${act.unit} | ₹${act.price}
+                           ${act.is_sale ? 'Sale' : 'Purchase'} | Qty: ${act.qty} ${act.unit} | Rs.${act.price}
                         </div>
                         <div class="mvc-item-sub" style="color:var(--text-light); font-size: 11px;">
-                           Stock: ${act.before_stock} → ${act.after_stock}
+                           Stock: ${act.before_stock} -> ${act.after_stock}
                         </div>
                     `;
                     d.innerHTML = stHtml;
@@ -1583,10 +1583,10 @@
                     let kHtml = `
                         <div class="mvc-item-title">${act.name} ${act.is_new ? '<span style="color:var(--primary);font-size:10px;">(NEW)</span>' : ''}</div>
                         <div class="mvc-item-sub">
-                           ${act.action_raw.includes('PAYMENT') ? 'Payment (Jama)' : 'Credit (Udhaar)'} | ₹${act.amount}
+                           ${act.action_raw.includes('PAYMENT') ? 'Payment (Jama)' : 'Credit (Udhaar)'} | Rs.${act.amount}
                         </div>
                         <div class="mvc-item-sub" style="color:var(--text-light); font-size: 11px;">
-                           Balance: ₹${act.before_balance} → ₹${act.after_balance}
+                           Balance: Rs.${act.before_balance} -> Rs.${act.after_balance}
                         </div>
                     `;
                     d.innerHTML = kHtml;
@@ -1605,7 +1605,7 @@
             if (preview.is_valid) {
                 btn.style.opacity = '1';
                 btn.style.pointerEvents = 'auto';
-                btn.innerText = `Confirm & Save (Total: ₹${preview.grand_total})`;
+                btn.innerText = `Confirm & Save (Total: Rs.${preview.grand_total})`;
                 btn.onclick = async () => {
                     btn.innerText = 'Saving...';
                     try {
@@ -1619,15 +1619,15 @@
                             showToast("All transactions saved successfully!");
                             if (data.bill_id) showToast("Bill Generated: " + data.bill_id);
                             
-                            await fetchInventory();
-                            await fetchKhata();
+                            await syncDataFromCloud();
                             closeMultiVoiceConfirm();
                         } else {
                             showToast("Error saving transactions");
                             btn.innerText = 'Confirm & Save';
                         }
                     } catch (e) {
-                        showToast("Network error while saving");
+                        console.error("Execute Voice Error:", e);
+                        showToast("Failed: " + e.message);
                         btn.innerText = 'Confirm & Save';
                     }
                 };
@@ -1637,9 +1637,7 @@
                 btn.innerText = 'Cannot Save (Errors Found)';
                 btn.onclick = null;
             }
-        }
-        
-        function closeMultiVoiceConfirm() {
+        }function closeMultiVoiceConfirm() {
             let overlay = document.getElementById('multiVoiceConfirmOverlay');
             if (overlay) overlay.style.display = 'none';
         }
