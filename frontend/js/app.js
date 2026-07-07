@@ -14,21 +14,16 @@
         
         function validatePhone() {
             let input = document.getElementById('loginPhoneInput');
-            let val = input.value.replace(/\D/g, ''); // only digits
-            
-            // Handle +91 pasting (where +91 is already included in HTML so we strip it)
-            if (val.length >= 12 && val.startsWith('91')) {
+            let val = input.value.replace(/\D/g, '');
+            if (val.startsWith('91') && val.length > 10) {
                 val = val.substring(2);
-            } else if (val.length >= 11 && val.startsWith('0')) {
-                val = val.substring(1);
             }
-            
-            // Enforce max 10 digits
             if (val.length > 10) {
                 val = val.substring(0, 10);
             }
-            
-            input.value = val;
+            if (input.value !== val) {
+                 input.value = val;
+            }
             
             let btn = document.getElementById('sendOtpBtn');
             let icon = document.getElementById('phoneCheckIcon');
@@ -55,11 +50,6 @@
             document.getElementById('globalLoader').style.display = 'flex';
             document.getElementById('globalLoaderText').innerText = 'Sending OTP...';
             
-            let longWaitMsg = setTimeout(() => {
-                let loader = document.getElementById('globalLoaderText');
-                if(loader) loader.innerHTML = 'Sending OTP...<br><span style="font-size:11px;opacity:0.8;font-weight:normal;">(First login takes ~40s, please wait...)</span>';
-            }, 6000);
-            
             try {
                 let res = await fetch(`${RENDER_API_URL}/api/auth/send-otp`, {
                     method: 'POST',
@@ -85,7 +75,6 @@
             } catch (e) {
                 showToast("Network Error");
             } finally {
-                if(typeof longWaitMsg !== 'undefined') clearTimeout(longWaitMsg);
                 document.getElementById('globalLoader').style.display = 'none';
             }
         }
@@ -1059,94 +1048,72 @@
         let recognition = null;
         let pendingVoiceActions = [];
 
-        
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let audioContext = null;
-        let analyser = null;
-        let silenceTimer = null;
-
-        async function toggleListening() {
-            if (isMicListening) {
-                stopRecording();
+        function toggleListening() {
+            if (isMicListening && recognition) {
+                recognition.stop();
                 return;
             }
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    showToast("⚠️ Mic Blocked! Try Chrome.");
+                    return;
+                }
+                recognition = new SpeechRecognition();
+                recognition.lang = 'hi-IN';
+                recognition.interimResults = true;
 
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const source = audioContext.createMediaStreamSource(stream);
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 256;
-                source.connect(analyser);
-                
-                const bufferLength = analyser.frequencyBinCount;
-                const dataArray = new Uint8Array(bufferLength);
-
-                const checkSilence = () => {
-                    if (!isMicListening) return;
-                    analyser.getByteFrequencyData(dataArray);
-                    let sum = 0;
-                    for(let i = 0; i < bufferLength; i++) sum += dataArray[i];
-                    let average = sum / bufferLength;
-
-                    if (average < 10) { // Silence threshold
-                        if (!silenceTimer) {
-                            silenceTimer = setTimeout(() => {
-                                console.log("Silence detected, stopping recording");
-                                stopRecording();
-                            }, 2500); // 2.5 seconds of silence
-                        }
-                    } else {
-                        if (silenceTimer) {
-                            clearTimeout(silenceTimer);
-                            silenceTimer = null;
-                        }
-                    }
-                    if (isMicListening) requestAnimationFrame(checkSilence);
-                };
-
-                mediaRecorder.ondataavailable = e => {
-                    if (e.data.size > 0) audioChunks.push(e.data);
-                };
-
-                mediaRecorder.onstart = () => {
+                recognition.onstart = () => {
                     isMicListening = true;
                     let ms = document.getElementById('mic-status');
                     if (ms) ms.innerText = "Suno... Munim sun raha hai...";
                     document.querySelectorAll('.fab-mic, .vc-mic-btn, .txv-mic').forEach(e => e.classList.add('listening'));
-                    document.getElementById('veStatusTitle').innerText = "Listening... Bolna start karein";
+                    document.getElementById('veStatusTitle').innerText = "Listening...";
                     document.getElementById('veStatusTitle').style.color = "var(--primary)";
-                    checkSilence();
                 };
 
-                mediaRecorder.onstop = async () => {
+                recognition.onresult = (e) => {
+                    let interimTranscript = '';
+                    let finalTranscript = '';
+                    for (let i = e.resultIndex; i < e.results.length; ++i) {
+                        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+                        else interimTranscript += e.results[i][0].transcript;
+                    }
+                    if (isVoiceOverlayActive) document.getElementById('veTranscriptText').innerText = finalTranscript || interimTranscript || "Listening...";
+                    if (finalTranscript && !isVoiceProcessing) {
+                        recognition.stop();
+                        processVoiceWithBackendAI(finalTranscript);
+                    }
+                };
+
+                recognition.onerror = (e) => {
+                    console.warn('Speech recognition error:', e.error);
+                    if (e.error === 'not-allowed' || e.error === 'service-not-available' || e.error === 'network') {
+                        // Mic is truly blocked - show manual input
+                        let manualInput = prompt("Voice Entry: Type your command (e.g. '2 kilo aata 100 ka'):");
+                        if (manualInput) {
+                            processVoiceWithBackendAI(manualInput);
+                        }
+                        return;
+                    }
+                    showToast("Maaf Kijiye, Awaaz samajh nahi aayi. Dubara bolein.");
+                    document.getElementById('veStatusTitle').innerText = "Couldn't hear. Tap mic to retry.";
+                    document.getElementById('veStatusTitle').style.color = "var(--red)";
+                };
+
+                recognition.onend = () => {
                     isMicListening = false;
                     document.querySelectorAll('.fab-mic, .vc-mic-btn, .txv-mic').forEach(e => e.classList.remove('listening'));
-                    if (silenceTimer) {
-                        clearTimeout(silenceTimer);
-                        silenceTimer = null;
+                    if (isVoiceOverlayActive && document.getElementById('veStatusTitle').innerText === "Listening...") {
+                        document.getElementById('veStatusTitle').innerText = "Tap Mic to Speak";
+                        document.getElementById('veStatusTitle').style.color = "var(--ink-main)";
                     }
-                    if (audioContext) {
-                        audioContext.close();
-                        audioContext = null;
-                    }
-                    // Stop all tracks
-                    stream.getTracks().forEach(track => track.stop());
-
-                    document.getElementById('veStatusTitle').innerText = "Processing Voice...";
-                    
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    await processAudioBlob(audioBlob);
                 };
-
-                mediaRecorder.start();
-
+                recognition.start();
             } catch (err) {
-                console.warn('Mic init error:', err);
                 isMicListening = false;
+                console.warn('Mic init error:', err);
+                // True fallback - show manual input
                 let manualInput = prompt("Voice Entry: Type your command (e.g. '2 kilo aata 100 ka'):");
                 if (manualInput) {
                     processVoiceWithBackendAI(manualInput);
@@ -1154,40 +1121,7 @@
             }
         }
 
-        async function processAudioBlob(blob) {
-            const formData = new FormData();
-            formData.append("audio", blob, "voice.webm");
-            
-            try {
-                const res = await fetch(`${RENDER_API_URL}/api/voice/transcribe`, {
-                    method: "POST",
-                    body: formData
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.status === "SUCCESS") {
-                        let transcript = data.transcript;
-                        document.getElementById('veTranscriptText').innerText = `"${transcript}"`;
-                        processVoiceWithBackendAI(transcript);
-                    }
-                } else {
-                    throw new Error("Transcription failed");
-                }
-            } catch (e) {
-                console.error(e);
-                showToast("Network Error: Could not process voice");
-                document.getElementById('veStatusTitle').innerText = "Tap Mic to Speak";
-            }
-        }
-
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-            }
-        }
-
         let voiceEntryContext = 'HOME';
-
         let isVoiceOverlayActive = false;
 
         function openVoiceEntryModal(context) {
@@ -1213,65 +1147,80 @@
             }, 800);
         }
 
-        let currentPreviewPayload = null;
-
         async function processVoiceWithBackendAI(transcript) {
             if (!transcript || isVoiceProcessing) return;
 
             isVoiceProcessing = true;
+            if (recognition && isMicListening) recognition.stop();
 
             const statusTitle = document.getElementById('veStatusTitle');
             const transcriptBox = document.getElementById('veTranscriptText');
             if (statusTitle) {
-                statusTitle.innerText = "Understanding Intent...";
+                statusTitle.innerText = "Processing...";
                 statusTitle.style.color = "var(--primary)";
             }
             if (transcriptBox) transcriptBox.innerText = `"${transcript}"`;
 
             const finishProcessing = () => {
                 isVoiceProcessing = false;
-                if (statusTitle && statusTitle.innerText === "Understanding Intent...") {
+                if (statusTitle && statusTitle.innerText === "Processing...") {
                     statusTitle.innerText = "Tap Mic to Speak";
                     statusTitle.style.color = "var(--ink-main)";
                 }
             };
 
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), VOICE_AI_TIMEOUT_MS);
                 const response = await fetch(`${RENDER_API_URL}/api/voice/process`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ merchant_id: MERCHANT_ID, transcript: transcript })
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        merchant_id: MERCHANT_ID,
+                        transcript: transcript
+                    }),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
 
                 if (response.ok) {
                     const result = await response.json();
                     if (result.status === "SUCCESS") {
-                        currentPreviewPayload = result.preview;
-                        showMultiVoiceConfirm(result.preview);
+                        applyAIToLocalMath(result);
                         finishProcessing();
                         return;
                     } else if (result.status === "NAVIGATE") {
-                        switchTab(result.target.toLowerCase(), document.getElementById(`nav-${result.target.toLowerCase()}`));
-                        closeVoiceEntryModal();
-                        finishProcessing();
-                        return;
-                    } else {
-                        showToast(result.msg || "Kripya dobara bolein");
+                        switchTab(result.target.toLowerCase());
                         finishProcessing();
                         return;
                     }
                 }
+
+                console.warn("Voice backend did not return a usable result. Falling back locally.");
             } catch (err) {
-                console.warn("Voice processing error", err);
+                console.warn("Voice backend unavailable. Falling back locally.", err);
             }
-            
-            showToast("Samajh nahi aaya. Thoda clear bolkar retry karein.");
-            if (statusTitle) {
-                statusTitle.innerText = "Couldn't understand. Tap to retry.";
-                statusTitle.style.color = "var(--red)";
+
+            const handledLocally = fallbackLocalProcessing(transcript);
+            if (!handledLocally) {
+                showToast("Samajh nahi aaya. Thoda clear bolkar retry karein.");
+                if (statusTitle) {
+                    statusTitle.innerText = "Couldn't understand. Tap to retry.";
+                    statusTitle.style.color = "var(--red)";
+                }
             }
             finishProcessing();
         }
+
+
+
+        setTimeout(() => {
+            let msh = document.getElementById('mic-status');
+            if (!isMicListening && msh) msh.innerText = "Mic Tap Karein, Aur Apni Baat Kahiye";
+        }, 3000);
+
 
         function applyAIToLocalMath(aiResult) {
             let actions = Array.isArray(aiResult.data) ? aiResult.data : [aiResult];
@@ -1528,119 +1477,373 @@
         // ==========================================
         // ðŸ”¥ MULTI-COMMAND VOICE CONFIRMATION UI
         // ==========================================
-        function showMultiVoiceConfirm(preview) {
-            closeVoiceEntryModal();
-            let overlay = document.getElementById('multiVoiceConfirmOverlay');
+        function showMultiVoiceConfirm(actions) {
+            pendingVoiceActions = actions;
+
+            let overlay = document.getElementById('multiVoiceOverlay');
             if (!overlay) {
                 overlay = document.createElement('div');
                 overlay.className = 'modal-overlay';
-                overlay.id = 'multiVoiceConfirmOverlay';
+                overlay.id = 'multiVoiceOverlay';
                 overlay.style.zIndex = '9600';
-                overlay.innerHTML = `
-                    <div class="modal-content" style="max-height:85vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
-                        <div style="padding:16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
-                            <h3 style="margin:0; font-size:18px;">Review AI Transactions</h3>
-                            <div onclick="closeMultiVoiceConfirm()" style="padding:8px; cursor:pointer;"><i class="ti ti-x" style="font-size:20px;"></i></div>
+                document.querySelector('.app-container').appendChild(overlay);
+            }
+
+            let sales = actions.filter(a => a.actionType === 'STOCK' && a.type === 'SALE');
+            let purchase = actions.filter(a => a.actionType === 'STOCK' && a.type === 'PURCHASE');
+            let custUdhaar = actions.filter(a => a.actionType === 'KHATA' && a.type === 'UDHAAR' && a.personType === 'C');
+            let custAdvance = actions.filter(a => a.actionType === 'KHATA' && a.type === 'PAYMENT' && a.personType === 'C');
+            let supDue = actions.filter(a => a.actionType === 'KHATA' && a.type === 'UDHAAR' && a.personType === 'S');
+            let supPayment = actions.filter(a => a.actionType === 'KHATA' && a.type === 'PAYMENT' && a.personType === 'S');
+            let transcriptText = document.getElementById('veTranscriptText') ? document.getElementById('veTranscriptText').innerText : "Voice transcript here";
+
+            let html = `
+            <div style="background:white; width:100%; border-radius:24px 24px 0 0; padding:24px 20px; display:flex; flex-direction:column; max-height:95vh; animation: slideUp 0.3s ease;">
+                
+                <div style="text-align:center; position:relative; margin-bottom: 20px;">
+                    <div style="width:72px; height:72px; background:var(--primary); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:32px; margin: 0 auto 16px; box-shadow:0 8px 24px rgba(52,211,153,0.3); border: 4px solid var(--primary-light);">
+                        <i class="ti ti-microphone"></i>
+                    </div>
+                    <div style="font-size:18px; font-weight:800; color:var(--ink-main);">We understood your command</div>
+                    <div style="font-size:14px; color:var(--ink-muted); margin-top:4px;">Please review and confirm</div>
+                </div>
+
+                <div style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; padding-right: 4px;">
+                    <div style="background:#f4fdf8; border:1px solid #d1fae5; border-radius:12px; padding:16px; margin-bottom:24px;">
+                        <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">Your Command</div>
+                        <div style="font-size:14px; color:var(--ink-main); line-height:1.5;">${transcriptText}</div>
+                    </div>
+            `;
+
+            if (sales.length > 0) {
+                let totalSales = sales.reduce((sum, act) => sum + act.total, 0);
+                html += `
+                    <div style="margin-bottom:24px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                            <i class="ti ti-shopping-cart" style="color:var(--primary); font-size:20px;"></i>
+                            <div style="font-size:16px; font-weight:800; color:var(--ink-main);">Aaj Ki Sales</div>
                         </div>
-                        <div id="mvc-list" style="flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px;"></div>
-                        <div style="padding:16px; border-top:1px solid var(--border); background:var(--bg-light);">
-                            <button id="mvc-confirm-btn" class="btn-primary" style="width:100%;">Confirm & Save</button>
+                `;
+                sales.forEach(act => {
+                    html += `
+                        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--ink-main); margin-bottom:12px; padding-left:28px;">
+                            <div style="flex:1;">${act.itemName}</div>
+                            <div style="width:60px; color:var(--ink-muted);">Qty: ${act.qty}</div>
+                            <div style="width:70px; color:var(--ink-main);">Rate: ₹${(act.total/act.qty).toFixed(0)}</div>
+                            <div style="width:80px; text-align:right;">Amount: ₹${act.total}</div>
+                        </div>
+                    `;
+                });
+                html += `
+                        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:var(--primary); padding-left:28px; margin-top:12px; border-top:1px dashed var(--border); padding-top:12px;">
+                            <div>Total Sales</div>
+                            <div>₹${totalSales}</div>
                         </div>
                     </div>
                 `;
-                document.body.appendChild(overlay);
             }
+
+            if (custUdhaar.length > 0) {
+                let totalUdhaar = custUdhaar.reduce((sum, act) => sum + act.amount, 0);
+                html += `
+                    <div style="margin-bottom:24px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                            <i class="ti ti-users" style="color:#6366f1; font-size:20px;"></i>
+                            <div style="font-size:16px; font-weight:800; color:var(--ink-main);">Udhaar (Grahak)</div>
+                        </div>
+                `;
+                custUdhaar.forEach(act => {
+                    let newTag = act.isNewPerson ? `<span style="background:var(--ochre-light); color:var(--ochre); font-size:9px; padding:2px 6px; border-radius:4px; margin-left:6px;">NEW</span>` : '';
+                    html += `
+                        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--ink-main); margin-bottom:12px; padding-left:28px;">
+                            <div style="flex:1;">${act.person.name} ${newTag}</div>
+                            <div style="flex:1; color:var(--ink-muted);">Udhaar Badhaya</div>
+                            <div style="width:80px; text-align:right; color:var(--red);">+ ₹${act.amount}</div>
+                        </div>
+                    `;
+                });
+                html += `
+                        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:var(--red); padding-left:28px; margin-top:12px; border-top:1px dashed var(--border); padding-top:12px;">
+                            <div>Total Udhaar Update</div>
+                            <div>+ ₹${totalUdhaar}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (custAdvance.length > 0) {
+                let totalAdvance = custAdvance.reduce((sum, act) => sum + act.amount, 0);
+                html += `
+                    <div style="margin-bottom:24px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                            <i class="ti ti-credit-card" style="color:var(--primary); font-size:20px;"></i>
+                            <div style="font-size:16px; font-weight:800; color:var(--ink-main);">Advance (Grahak)</div>
+                        </div>
+                `;
+                custAdvance.forEach(act => {
+                    let newTag = act.isNewPerson ? `<span style="background:var(--ochre-light); color:var(--ochre); font-size:9px; padding:2px 6px; border-radius:4px; margin-left:6px;">NEW</span>` : '';
+                    html += `
+                        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--ink-main); margin-bottom:12px; padding-left:28px;">
+                            <div style="flex:1;">${act.person.name} ${newTag}</div>
+                            <div style="flex:1; color:var(--ink-muted);">Advance Liya</div>
+                            <div style="width:80px; text-align:right; color:var(--primary);">+ ₹${act.amount}</div>
+                        </div>
+                    `;
+                });
+                html += `
+                        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:var(--primary); padding-left:28px; margin-top:12px; border-top:1px dashed var(--border); padding-top:12px;">
+                            <div>Total Advance Update</div>
+                            <div>+ ₹${totalAdvance}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (supDue.length > 0) {
+                let totalDue = supDue.reduce((sum, act) => sum + act.amount, 0);
+                html += `
+                    <div style="margin-bottom:24px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                            <i class="ti ti-truck" style="color:#d97706; font-size:20px;"></i>
+                            <div style="font-size:16px; font-weight:800; color:var(--ink-main);">Due (Supplier)</div>
+                        </div>
+                `;
+                supDue.forEach(act => {
+                    let newTag = act.isNewPerson ? `<span style="background:var(--ochre-light); color:var(--ochre); font-size:9px; padding:2px 6px; border-radius:4px; margin-left:6px;">NEW</span>` : '';
+                    html += `
+                        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--ink-main); margin-bottom:12px; padding-left:28px;">
+                            <div style="flex:1;">${act.person.name} ${newTag}</div>
+                            <div style="flex:1; color:var(--ink-muted);">Baki (Dene hain)</div>
+                            <div style="width:80px; text-align:right; color:var(--red);">+ ₹${act.amount}</div>
+                        </div>
+                    `;
+                });
+                html += `
+                        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:var(--red); padding-left:28px; margin-top:12px; border-top:1px dashed var(--border); padding-top:12px;">
+                            <div>Total Supplier Due</div>
+                            <div>+ ₹${totalDue}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (supPayment.length > 0) {
+                let totalPayment = supPayment.reduce((sum, act) => sum + act.amount, 0);
+                html += `
+                    <div style="margin-bottom:24px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                            <i class="ti ti-cash" style="color:var(--primary); font-size:20px;"></i>
+                            <div style="font-size:16px; font-weight:800; color:var(--ink-main);">Payment (Supplier)</div>
+                        </div>
+                `;
+                supPayment.forEach(act => {
+                    let newTag = act.isNewPerson ? `<span style="background:var(--ochre-light); color:var(--ochre); font-size:9px; padding:2px 6px; border-radius:4px; margin-left:6px;">NEW</span>` : '';
+                    html += `
+                        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--ink-main); margin-bottom:12px; padding-left:28px;">
+                            <div style="flex:1;">${act.person.name} ${newTag}</div>
+                            <div style="flex:1; color:var(--ink-muted);">Payment Diya</div>
+                            <div style="width:80px; text-align:right; color:var(--primary);">- ₹${act.amount}</div>
+                        </div>
+                    `;
+                });
+                html += `
+                        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:var(--primary); padding-left:28px; margin-top:12px; border-top:1px dashed var(--border); padding-top:12px;">
+                            <div>Total Supplier Payment</div>
+                            <div>- ₹${totalPayment}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (purchase.length > 0) {
+                let totalStock = purchase.reduce((sum, act) => sum + act.qty, 0);
+                html += `
+                    <div style="margin-bottom:24px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                            <i class="ti ti-package" style="color:#d97706; font-size:20px;"></i>
+                            <div style="font-size:16px; font-weight:800; color:var(--ink-main);">Stock Update</div>
+                        </div>
+                `;
+                purchase.forEach(act => {
+                    html += `
+                        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--ink-main); margin-bottom:12px; padding-left:28px;">
+                            <div style="flex:1;">${act.itemName}</div>
+                            <div style="flex:1; color:var(--ink-muted);">Stock Add Kiya</div>
+                            <div style="width:80px; text-align:right; color:var(--primary);">+ ${act.qty} ${act.unit}</div>
+                        </div>
+                    `;
+                });
+                html += `
+                        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:var(--primary); padding-left:28px; margin-top:12px; border-top:1px dashed var(--border); padding-top:12px;">
+                            <div>Total Stock Added</div>
+                            <div>+ ${totalStock}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
+                    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:12px; display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+                        <i class="ti ti-info-circle" style="color:#3b82f6; font-size:20px;"></i>
+                        <div style="font-size:12px; color:#1e3a8a;">Stock, Sales, Udhaar aur Advance sab update ho jayega.</div>
+                    </div>
+                </div>
+                
+                <div style="padding-top:16px; display:flex; gap:12px; background:white; flex-shrink: 0;">
+                    <button style="flex:1; padding:14px; border:1px solid var(--border); background:white; border-radius:12px; font-weight:700; color:var(--ink-main); cursor:pointer;" onclick="document.getElementById('multiVoiceOverlay').style.display='none';">Cancel</button>
+                    <button style="flex:1; padding:14px; border:1px solid var(--primary); background:white; border-radius:12px; font-weight:700; color:var(--primary); cursor:pointer;" onclick="showVoiceActionEditor()">Edit</button>
+                    <button style="flex:1.5; padding:14px; border:none; background:var(--primary); border-radius:12px; font-weight:700; color:white; cursor:pointer;" onclick="executeMultiVoiceConfirm()">Confirm & Save</button>
+                </div>
+            </div>
+            `;
+
+            overlay.innerHTML = html;
+            closeVoiceEntryModal();
             overlay.style.display = 'flex';
-
-            let listContainer = document.getElementById('mvc-list');
-            listContainer.innerHTML = '';
-
-            if (preview.validation_errors && preview.validation_errors.length > 0) {
-                let errDiv = document.createElement('div');
-                errDiv.style.color = 'var(--red)';
-                errDiv.style.fontSize = '12px';
-                errDiv.style.marginBottom = '10px';
-                errDiv.innerText = "Errors: " + preview.validation_errors.join(", ");
-                listContainer.appendChild(errDiv);
-            }
-
-            preview.actions.forEach((act, idx) => {
-                let d = document.createElement('div');
-                d.className = 'mvc-item';
-
-                if (act.type === 'STOCK') {
-                    let stHtml = `
-                        <div class="mvc-item-title">${act.item_name} ${act.is_new ? '<span style="color:var(--primary);font-size:10px;">(NEW)</span>' : ''}</div>
-                        <div class="mvc-item-sub">
-                           ${act.is_sale ? 'Sale' : 'Purchase'} | Qty: ${act.qty} ${act.unit} | Rs.${act.price}
-                        </div>
-                        <div class="mvc-item-sub" style="color:var(--text-light); font-size: 11px;">
-                           Stock: ${act.before_stock} -> ${act.after_stock}
-                        </div>
-                    `;
-                    d.innerHTML = stHtml;
-                } else if (act.type === 'KHATA') {
-                    let kHtml = `
-                        <div class="mvc-item-title">${act.name} ${act.is_new ? '<span style="color:var(--primary);font-size:10px;">(NEW)</span>' : ''}</div>
-                        <div class="mvc-item-sub">
-                           ${act.action_raw.includes('PAYMENT') ? 'Payment (Jama)' : 'Credit (Udhaar)'} | Rs.${act.amount}
-                        </div>
-                        <div class="mvc-item-sub" style="color:var(--text-light); font-size: 11px;">
-                           Balance: Rs.${act.before_balance} -> Rs.${act.after_balance}
-                        </div>
-                    `;
-                    d.innerHTML = kHtml;
-                }
-                listContainer.appendChild(d);
-            });
-            
-            if (preview.generate_bill) {
-                let bDiv = document.createElement('div');
-                bDiv.className = 'mvc-item';
-                bDiv.innerHTML = `<div class="mvc-item-title" style="color:var(--primary);"><i class="ti ti-receipt"></i> Generate Digital Bill</div>`;
-                listContainer.appendChild(bDiv);
-            }
-
-            let btn = document.getElementById('mvc-confirm-btn');
-            if (preview.is_valid) {
-                btn.style.opacity = '1';
-                btn.style.pointerEvents = 'auto';
-                btn.innerText = `Confirm & Save (Total: Rs.${preview.grand_total})`;
-                btn.onclick = async () => {
-                    btn.innerText = 'Saving...';
-                    try {
-                        const res = await fetch(`${RENDER_API_URL}/api/voice/execute`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ merchant_id: MERCHANT_ID, preview: currentPreviewPayload })
-                        });
-                        const data = await res.json();
-                        if (data.status === "SUCCESS") {
-                            showToast("All transactions saved successfully!");
-                            if (data.bill_id) showToast("Bill Generated: " + data.bill_id);
-                            
-                            await syncDataFromCloud();
-                            closeMultiVoiceConfirm();
-                        } else {
-                            showToast("Error saving transactions");
-                            btn.innerText = 'Confirm & Save';
-                        }
-                    } catch (e) {
-                        console.error("Execute Voice Error:", e);
-                        showToast("Failed: " + e.message);
-                        btn.innerText = 'Confirm & Save';
-                    }
-                };
-            } else {
-                btn.style.opacity = '0.5';
-                btn.style.pointerEvents = 'none';
-                btn.innerText = 'Cannot Save (Errors Found)';
-                btn.onclick = null;
-            }
-        }function closeMultiVoiceConfirm() {
-            let overlay = document.getElementById('multiVoiceConfirmOverlay');
-            if (overlay) overlay.style.display = 'none';
         }
+
+        function escapeAttr(value) {
+            return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function getVoicePartyOptions(selectedId, selectedType) {
+            let label = selectedType === 'S' ? 'New Supplier' : 'New Customer';
+            let html = `<option value="NEW">${label}</option>`;
+            localKhata.forEach(p => {
+                let selected = selectedType === 'C' && String(p.id) === String(selectedId) ? 'selected' : '';
+                html += `<option value="C-${p.id}" ${selected}>Customer: ${escapeAttr(p.name)}</option>`;
+            });
+            localSuppliers.forEach(p => {
+                let selected = selectedType === 'S' && String(p.id) === String(selectedId) ? 'selected' : '';
+                html += `<option value="S-${p.id}" ${selected}>Supplier: ${escapeAttr(p.name)}</option>`;
+            });
+            return html;
+        }
+
+        function getVoiceItemOptions(selectedItemName) {
+            let html = `<option value="NEW">New item</option>`;
+            localStock.forEach(item => {
+                let selected = item.name === selectedItemName ? 'selected' : '';
+                html += `<option value="${escapeAttr(item.id)}" ${selected}>${escapeAttr(item.name)}</option>`;
+            });
+            return html;
+        }
+
+        function showVoiceActionEditor() {
+            let overlay = document.getElementById('multiVoiceOverlay');
+            if (!overlay || pendingVoiceActions.length === 0) return;
+
+            let html = `
+            <div style="background:white; width:100%; border-radius:24px 24px 0 0; padding:22px 20px; display:flex; flex-direction:column; max-height:95vh; animation: slideUp 0.3s ease;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                    <div>
+                        <div style="font-size:18px; font-weight:800; color:var(--ink-main);">Edit Details</div>
+                        <div style="font-size:13px; color:var(--ink-muted); margin-top:3px;">Correct anything AI misunderstood.</div>
+                    </div>
+                    <button style="border:none; background:#f8fafc; width:36px; height:36px; border-radius:50%; color:var(--ink-main); cursor:pointer;" onclick="showMultiVoiceConfirm(pendingVoiceActions)"><i class="ti ti-x"></i></button>
+                </div>
+                <div style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; padding-right:4px;">
+            `;
+
+            pendingVoiceActions.forEach((act, idx) => {
+                if (act.actionType === 'STOCK') {
+                    let selectedItemId = act.itemObj ? act.itemObj.id : 'NEW';
+                    html += `
+                    <div style="border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:14px; background:#f8fafc;">
+                        <div style="font-size:12px; font-weight:800; color:var(--primary); margin-bottom:12px;">Action ${idx + 1}: Stock / Sale</div>
+                        <div style="display:flex; gap:10px; margin-bottom:10px;">
+                            <div class="input-group" style="flex:1; margin-bottom:0;"><label style="font-size:12px; font-weight:700;">Type</label><select id="veType-${idx}"><option value="SALE" ${act.type === 'SALE' ? 'selected' : ''}>Sale</option><option value="PURCHASE" ${act.type === 'PURCHASE' ? 'selected' : ''}>Stock Add</option></select></div>
+                            <div class="input-group" style="flex:1; margin-bottom:0;"><label style="font-size:12px; font-weight:700;">Item</label><select id="veItem-${idx}" onchange="document.getElementById('veItemName-${idx}').style.display=this.value==='NEW'?'block':'none';">${getVoiceItemOptions(act.itemName)}</select></div>
+                        </div>
+                        <div class="input-group" style="margin-bottom:10px; display:${selectedItemId === 'NEW' ? 'block' : 'none'};" id="veItemName-${idx}"><label style="font-size:12px; font-weight:700;">Item Name</label><input type="text" id="veItemNameInput-${idx}" value="${escapeAttr(act.itemName)}"></div>
+                        <div style="display:flex; gap:10px;">
+                            <div class="input-group" style="flex:1; margin-bottom:0;"><label style="font-size:12px; font-weight:700;">Qty</label><input type="number" id="veQty-${idx}" value="${escapeAttr(act.qty || 1)}"></div>
+                            <div class="input-group" style="flex:1; margin-bottom:0;"><label style="font-size:12px; font-weight:700;">Unit</label><input type="text" id="veUnit-${idx}" value="${escapeAttr(act.unit || 'items')}"></div>
+                            <div class="input-group" style="flex:1; margin-bottom:0;"><label style="font-size:12px; font-weight:700;">Amount</label><input type="number" id="veTotal-${idx}" value="${escapeAttr(act.total || 0)}"></div>
+                        </div>
+                    </div>
+                    `;
+                } else {
+                    let selectedPartyId = act.person && act.person.id !== 'NEW' ? act.person.id : 'NEW';
+                    html += `
+                    <div style="border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:14px; background:#f8fafc;">
+                        <div style="font-size:12px; font-weight:800; color:#6366f1; margin-bottom:12px;">Action ${idx + 1}: Khata</div>
+                        <div style="display:flex; gap:10px; margin-bottom:10px;">
+                            <div class="input-group" style="flex:1; margin-bottom:0;"><label style="font-size:12px; font-weight:700;">Type</label><select id="veType-${idx}"><option value="UDHAAR" ${act.type === 'UDHAAR' ? 'selected' : ''}>Udhaar</option><option value="PAYMENT" ${act.type === 'PAYMENT' ? 'selected' : ''}>Payment / Jama</option></select></div>
+                            <div class="input-group" style="flex:1; margin-bottom:0;"><label style="font-size:12px; font-weight:700;">Party</label><select id="veParty-${idx}" onchange="document.getElementById('vePersonName-${idx}').style.display=this.value==='NEW'?'block':'none';">${getVoicePartyOptions(selectedPartyId, act.personType || 'C')}</select></div>
+                        </div>
+                        <div class="input-group" style="margin-bottom:10px; display:${selectedPartyId === 'NEW' ? 'block' : 'none'};" id="vePersonName-${idx}"><label style="font-size:12px; font-weight:700;">Name</label><input type="text" id="vePersonNameInput-${idx}" value="${escapeAttr(act.person ? act.person.name : '')}"></div>
+                        <div class="input-group" style="margin-bottom:0;"><label style="font-size:12px; font-weight:700;">Amount</label><input type="number" id="veAmount-${idx}" value="${escapeAttr(act.amount || 0)}"></div>
+                    </div>
+                    `;
+                }
+            });
+
+            html += `
+                </div>
+                <div style="padding-top:16px; display:flex; gap:12px; background:white; flex-shrink:0;">
+                    <button style="flex:1; padding:14px; border:1px solid var(--border); background:white; border-radius:12px; font-weight:700; color:var(--ink-main); cursor:pointer;" onclick="showMultiVoiceConfirm(pendingVoiceActions)">Back</button>
+                    <button style="flex:1.5; padding:14px; border:none; background:var(--primary); border-radius:12px; font-weight:700; color:white; cursor:pointer;" onclick="saveVoiceActionEdits()">Save Details</button>
+                </div>
+            </div>
+            `;
+            overlay.innerHTML = html;
+            overlay.style.display = 'flex';
+        }
+
+        function saveVoiceActionEdits() {
+            pendingVoiceActions = pendingVoiceActions.map((act, idx) => {
+                let newAct = {...act
+                };
+                if (act.actionType === 'STOCK') {
+                    let itemSelect = document.getElementById(`veItem-${idx}`).value;
+                    let selectedItem = itemSelect !== 'NEW' ? localStock.find(s => String(s.id) === String(itemSelect)) : null;
+                    newAct.type = document.getElementById(`veType-${idx}`).value;
+                    newAct.itemObj = selectedItem || null;
+                    newAct.itemName = selectedItem ? selectedItem.name : (document.getElementById(`veItemNameInput-${idx}`).value.trim() || 'New Item');
+                    newAct.qty = parseFloat(document.getElementById(`veQty-${idx}`).value) || 1;
+                    newAct.unit = document.getElementById(`veUnit-${idx}`).value.trim() || (selectedItem ? selectedItem.unit : 'items');
+                    newAct.total = parseFloat(document.getElementById(`veTotal-${idx}`).value) || 0;
+                } else {
+                    let partySelect = document.getElementById(`veParty-${idx}`).value;
+                    newAct.type = document.getElementById(`veType-${idx}`).value;
+                    newAct.amount = parseFloat(document.getElementById(`veAmount-${idx}`).value) || 0;
+
+                    if (partySelect === 'NEW') {
+                        newAct.personType = act.personType || 'C';
+                        newAct.isNewPerson = true;
+                        newAct.person = {
+                            id: 'NEW',
+                            name: document.getElementById(`vePersonNameInput-${idx}`).value.trim() || (newAct.personType === 'S' ? 'New Supplier' : 'New Customer')
+                        };
+                    } else {
+                        let [personType, personId] = partySelect.split('-');
+                        let targetArr = personType === 'C' ? localKhata : localSuppliers;
+                        let person = targetArr.find(p => String(p.id) === String(personId));
+                        newAct.personType = personType;
+                        newAct.isNewPerson = false;
+                        newAct.person = person || newAct.person;
+                    }
+                }
+                return newAct;
+            });
+
+            showMultiVoiceConfirm(pendingVoiceActions);
+        }
+
+        async function executeMultiVoiceConfirm() {
+            let success = await TransactionEngine.processMultiVoice(pendingVoiceActions);
+            if (success) {
+                document.getElementById('multiVoiceOverlay').style.display = 'none';
+                pendingVoiceActions = [];
+                renderUI();
+                if (document.getElementById('salesOverlay').style.display === 'flex') renderSalesLedger();
+            }
+        }
+
+        // ==========================================
+        // OTHER LOGIC (Sales Ledger, Modals, Tabs, Sync)
+        // ==========================================
 
         function openEditStockModal(index) {
             let item = localStock[index];
