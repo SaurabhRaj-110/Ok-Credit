@@ -1,6 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.database import get_db_connection
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models import MerchantUsage
+from app.services.auth_service import get_current_merchant_id
 import datetime
 
 router = APIRouter()
@@ -10,8 +13,11 @@ class TrackRequest(BaseModel):
     action: str
 
 @router.post("/track")
-def track_usage(req: TrackRequest):
+def track_usage(req: TrackRequest, db: Session = Depends(get_db), jwt_merchant_id: str = Depends(get_current_merchant_id)):
     m_id = req.merchant_id
+    if m_id != jwt_merchant_id:
+        raise HTTPException(status_code=403, detail="Access Denied")
+        
     if m_id.startswith('admin'):
         return {"status": "SUCCESS", "message": "Admin not tracked"}
         
@@ -19,37 +25,24 @@ def track_usage(req: TrackRequest):
     now_str = now.isoformat()
     today_date = now.date().isoformat()
     
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM merchant_usage WHERE merchant_id = ?", (m_id,))
-        usage = cursor.fetchone()
+    try:
+        usage = db.query(MerchantUsage).filter(MerchantUsage.merchant_id == m_id).first()
         
         if not usage:
-            # Create if missing
-            cursor.execute(
-                "INSERT INTO merchant_usage (merchant_id, role, first_login, last_login) VALUES (?, 'merchant', ?, ?)",
-                (m_id, now_str, now_str)
-            )
-            conn.commit()
-            cursor.execute("SELECT * FROM merchant_usage WHERE merchant_id = ?", (m_id,))
-            usage = cursor.fetchone()
+            usage = MerchantUsage(merchant_id=m_id, role='merchant', first_login=now_str, last_login=now_str)
+            db.add(usage)
+            db.commit()
+            db.refresh(usage)
             
-        # Extract fields
-        current_streak = usage['current_streak'] or 0
-        highest_streak = usage['highest_streak'] or 0
-        total_days = usage['total_login_days'] or 0
-        total_sessions = usage['total_sessions'] or 0
-        last_login_str = usage['last_login']
-        
-        updates = []
-        params = []
+        current_streak = usage.current_streak or 0
+        highest_streak = usage.highest_streak or 0
+        total_days = usage.total_login_days or 0
+        total_sessions = usage.total_sessions or 0
+        last_login_str = usage.last_login
         
         if req.action == "login":
-            total_sessions += 1
-            updates.append("total_sessions = ?")
-            params.append(total_sessions)
+            usage.total_sessions = total_sessions + 1
             
-            # Check streak
             last_login_date = "1970-01-01"
             if last_login_str:
                 try:
@@ -58,81 +51,78 @@ def track_usage(req: TrackRequest):
                     pass
                     
             if current_streak == 0:
-                current_streak = 1
-                total_days += 1
-                updates.append("current_streak = ?")
-                params.append(current_streak)
-                updates.append("total_login_days = ?")
-                params.append(total_days)
-                updates.append("last_login = ?")
-                params.append(now_str)
-                if current_streak > highest_streak:
-                    highest_streak = current_streak
-                    updates.append("highest_streak = ?")
-                    params.append(highest_streak)
+                usage.current_streak = 1
+                usage.total_login_days = total_days + 1
+                usage.last_login = now_str
+                if usage.current_streak > highest_streak:
+                    usage.highest_streak = usage.current_streak
             elif last_login_date != today_date:
-                total_days += 1
+                usage.total_login_days = total_days + 1
                 
-                # Check if consecutive
                 last_dt = datetime.datetime.strptime(last_login_date, "%Y-%m-%d")
                 curr_dt = datetime.datetime.strptime(today_date, "%Y-%m-%d")
                 if (curr_dt - last_dt).days == 1:
-                    current_streak += 1
+                    usage.current_streak = current_streak + 1
                 else:
-                    current_streak = 1
+                    usage.current_streak = 1
                     
-                if current_streak > highest_streak:
-                    highest_streak = current_streak
-                    updates.append("highest_streak = ?")
-                    params.append(highest_streak)
+                if usage.current_streak > highest_streak:
+                    usage.highest_streak = usage.current_streak
                     
-                updates.append("total_login_days = ?")
-                params.append(total_days)
-                updates.append("current_streak = ?")
-                params.append(current_streak)
-                updates.append("last_login = ?")
-                params.append(now_str)
+                usage.last_login = now_str
                 
         elif req.action == "voice":
-            updates.append("voice_commands = voice_commands + 1")
+            usage.voice_commands = (usage.voice_commands or 0) + 1
         elif req.action == "ocr":
-            updates.append("ocr_scans = ocr_scans + 1")
+            usage.ocr_scans = (usage.ocr_scans or 0) + 1
         elif req.action == "sale":
-            updates.append("sales_entries = sales_entries + 1")
+            usage.sales_entries = (usage.sales_entries or 0) + 1
         elif req.action == "stock":
-            updates.append("stock_updates = stock_updates + 1")
+            usage.stock_updates = (usage.stock_updates or 0) + 1
         elif req.action == "khata":
-            updates.append("khata_updates = khata_updates + 1")
+            usage.khata_updates = (usage.khata_updates or 0) + 1
             
-        updates.append("last_active = ?")
-        params.append(now_str)
-        updates.append("updated_at = ?")
-        params.append(now_str)
-        params.append(m_id)
+        usage.last_active = now_str
+        usage.updated_at = now
         
-        query = f"UPDATE merchant_usage SET {', '.join(updates)} WHERE merchant_id = ?"
-        cursor.execute(query, tuple(params))
-        conn.commit()
+        db.commit()
+        db.refresh(usage)
         
         return {
             "status": "SUCCESS", 
-            "current_streak": current_streak, 
-            "total_login_days": total_days,
-            "voice_commands": usage['voice_commands'] if req.action != "voice" else (usage['voice_commands'] or 0) + 1,
-            "ocr_scans": usage['ocr_scans'] if req.action != "ocr" else (usage['ocr_scans'] or 0) + 1,
-            "sales_entries": usage['sales_entries'] if req.action != "sale" else (usage['sales_entries'] or 0) + 1,
-            "khata_updates": usage['khata_updates'] if req.action != "khata" else (usage['khata_updates'] or 0) + 1,
-            "stock_updates": usage['stock_updates'] if req.action != "stock" else (usage['stock_updates'] or 0) + 1
+            "current_streak": usage.current_streak, 
+            "total_login_days": usage.total_login_days,
+            "voice_commands": usage.voice_commands,
+            "ocr_scans": usage.ocr_scans,
+            "sales_entries": usage.sales_entries,
+            "khata_updates": usage.khata_updates,
+            "stock_updates": usage.stock_updates
         }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
         
 @router.get("/stats/{merchant_id}")
-def get_usage_stats(merchant_id: str):
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM merchant_usage WHERE merchant_id = ?", (merchant_id,))
-        usage = cursor.fetchone()
+def get_usage_stats(merchant_id: str, db: Session = Depends(get_db), jwt_merchant_id: str = Depends(get_current_merchant_id)):
+    if merchant_id != jwt_merchant_id:
+        raise HTTPException(status_code=403, detail="Access Denied")
+        
+    try:
+        usage = db.query(MerchantUsage).filter(MerchantUsage.merchant_id == merchant_id).first()
         if not usage:
             return {"status": "SUCCESS", "data": {
                 "current_streak": 0, "total_login_days": 0, "voice_commands": 0, "ocr_scans": 0, "khata_updates": 0, "stock_updates": 0, "sales_entries": 0
             }}
-        return {"status": "SUCCESS", "data": dict(usage)}
+            
+        data = {
+            "current_streak": usage.current_streak,
+            "total_login_days": usage.total_login_days,
+            "voice_commands": usage.voice_commands,
+            "ocr_scans": usage.ocr_scans,
+            "khata_updates": usage.khata_updates,
+            "stock_updates": usage.stock_updates,
+            "sales_entries": usage.sales_entries
+        }
+        return {"status": "SUCCESS", "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

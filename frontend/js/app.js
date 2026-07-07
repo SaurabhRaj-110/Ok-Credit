@@ -1,3 +1,25 @@
+
+const originalFetch = window.fetch;
+window.fetch = async function() {
+    let [resource, config] = arguments;
+    if (!config) config = {};
+    if (!config.headers) config.headers = {};
+    
+    // Convert Headers object to plain object if needed, or just append
+    if (config.headers instanceof Headers) {
+        if (localStorage.getItem('shopsathi_auth_token')) {
+            config.headers.append('Authorization', 'Bearer ' + localStorage.getItem('shopsathi_auth_token'));
+        }
+    } else {
+        if (localStorage.getItem('shopsathi_auth_token')) {
+            config.headers['Authorization'] = 'Bearer ' + localStorage.getItem('shopsathi_auth_token');
+        }
+    }
+    
+    // For FormData, we don't strictly need to do anything special here as long as Authorization header is added
+    return originalFetch(resource, config);
+};
+
 // ==========================================
         // SYSTEM INIT & CORE DATA
         // ==========================================
@@ -132,10 +154,14 @@
                         window.location.href = 'admin.html';
                     } else {
                         localStorage.setItem('shopsathi_merchant_id', data.merchant_id);
+                        if(data.access_token) localStorage.setItem('shopsathi_auth_token', data.access_token);
                         MERCHANT_ID = data.merchant_id;
                         MERCHANT_ROLE = 'merchant';
                         document.getElementById('splashLoginOverlay').style.display = 'none';
                         initShopSathi();
+                        
+                        // Track usage after explicit login
+                        trackUsage('login');
                     }
                 } else {
                     showToast("Wrong OTP");
@@ -4327,15 +4353,6 @@
         }
         
         function bootApp() {
-            // Force login flow on new tab/window for demo purposes
-            if (!sessionStorage.getItem('session_started')) {
-                localStorage.removeItem('shopsathi_merchant_id');
-                localStorage.removeItem('shopsathi_role');
-                MERCHANT_ID = "";
-                MERCHANT_ROLE = "";
-                sessionStorage.setItem('session_started', 'true');
-            }
-
             if (!MERCHANT_ID) {
                 document.getElementById('splashLoginOverlay').style.display = 'flex';
                 return;

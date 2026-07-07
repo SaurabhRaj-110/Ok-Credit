@@ -1,10 +1,11 @@
-import sqlite3
-from fastapi import APIRouter, HTTPException, Form
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy.orm import Session
 import uuid
-from datetime import datetime
-from app.database import get_db_connection
+from app.database import get_db
+from app.models import DailySale, Inventory
+from app.services.auth_service import get_current_merchant_id
 
 router = APIRouter()
 
@@ -17,51 +18,37 @@ class SalesEdit(BaseModel):
     entry_source: Optional[str] = "Manual"
 
 @router.put("/{sale_id}")
-def update_sale(sale_id: str, payload: SalesEdit):
+def update_sale(sale_id: str, payload: SalesEdit, db: Session = Depends(get_db), jwt_merchant_id: str = Depends(get_current_merchant_id)):
+    if payload.merchant_id != jwt_merchant_id:
+        raise HTTPException(status_code=403, detail="Access Denied")
+        
     try:
-        with get_db_connection() as conn:
-            conn.isolation_level = "EXCLUSIVE"
-            cursor = conn.cursor()
+        sale = db.query(DailySale).filter(DailySale.sale_id == sale_id, DailySale.merchant_id == payload.merchant_id).first()
+        if not sale:
+            raise HTTPException(status_code=404, detail="Sale not found")
             
-            cursor.execute("SELECT * FROM daily_sales WHERE sale_id = ? AND merchant_id = ?", (sale_id, payload.merchant_id))
-            conn.row_factory = sqlite3.Row
-            row = cursor.fetchone()
-            
-            if not row:
-                raise HTTPException(status_code=404, detail="Sale not found")
+        old_qty = sale.qty if sale.qty else 0
+        old_item = sale.item if sale.item else ""
+        
+        if old_item.lower() == payload.item.lower() and old_item != "Udhaar Clearance":
+            diff = old_qty - payload.qty
+            inventory = db.query(Inventory).filter(
+                Inventory.merchant_id == payload.merchant_id, 
+                Inventory.item_name.ilike(payload.item)
+            ).first()
+            if inventory:
+                inventory.current_stock += diff
                 
-            old_qty = row[4] # qty is index 4 if select *
-            old_item = row[3] # item is index 3
-            
-            if old_item.lower() == payload.item.lower() and old_item != "Udhaar Clearance":
-                diff = old_qty - payload.qty
-                cursor.execute("""
-                    UPDATE inventory 
-                    SET current_stock = current_stock + ? 
-                    WHERE merchant_id = ? AND LOWER(item_name) = ?
-                """, (diff, payload.merchant_id, payload.item.lower()))
-            
-            cursor.execute("""
-                UPDATE daily_sales
-                SET item = ?, qty = ?, amount = ?, note = ?, entry_source = ?
-                WHERE sale_id = ? AND merchant_id = ?
-            """, (payload.item, payload.qty, payload.amount, payload.note, payload.entry_source, sale_id, payload.merchant_id))
-            
-            conn.commit()
-            
-            from app.routes.notifications import generate_notification
-            generate_notification(
-                merchant_id=payload.merchant_id,
-                title="Sale Updated",
-                message=f"Updated sale: {payload.item} for ₹{payload.amount}",
-                type="info",
-                category="Sales",
-                reference_id=sale_id,
-                reference_type="SALE"
-            )
-            
-            return {"status": "success", "message": "Sale updated atomically"}
+        sale.item = payload.item
+        sale.qty = payload.qty
+        sale.amount = payload.amount
+        sale.note = payload.note
+        sale.entry_source = payload.entry_source
+        
+        db.commit()
+        return {"status": "success", "message": "Sale updated atomically"}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 class SaleCreate(BaseModel):
@@ -74,38 +61,25 @@ class SaleCreate(BaseModel):
     entry_source: Optional[str] = "Manual"
 
 @router.post("/")
-def create_sale(payload: SaleCreate):
+def create_sale(payload: SaleCreate, db: Session = Depends(get_db), jwt_merchant_id: str = Depends(get_current_merchant_id)):
+    if payload.merchant_id != jwt_merchant_id:
+        raise HTTPException(status_code=403, detail="Access Denied")
+        
     sale_id = "sale_" + str(uuid.uuid4().hex)[:10]
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO daily_sales (sale_id, merchant_id, type, item, qty, amount, note, entry_source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (sale_id, payload.merchant_id, payload.type, payload.item, payload.qty, payload.amount, payload.note, payload.entry_source))
-            conn.commit()
-            
-            from app.routes.notifications import generate_notification
-            if payload.entry_source == "Voice":
-                title = "Voice Entry Added"
-                message = f"New voice entry of ₹{payload.amount} added to sale."
-            elif payload.entry_source == "KhataSnap":
-                title = "OCR Sale Added"
-                message = f"New OCR scanned sale of ₹{payload.amount} added."
-            else:
-                title = "New Sale Recorded"
-                message = f"₹{payload.amount} sale added successfully."
-                
-            generate_notification(
-                merchant_id=payload.merchant_id,
-                title=title,
-                message=message,
-                type="success",
-                category="Sales",
-                reference_id=sale_id,
-                reference_type="SALE"
-            )
-            
-            return {"status": "success", "sale_id": sale_id}
+        new_sale = DailySale(
+            sale_id=sale_id,
+            merchant_id=payload.merchant_id,
+            type=payload.type,
+            item=payload.item,
+            qty=payload.qty,
+            amount=payload.amount,
+            note=payload.note,
+            entry_source=payload.entry_source
+        )
+        db.add(new_sale)
+        db.commit()
+        return {"status": "success", "sale_id": sale_id}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

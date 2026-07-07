@@ -7,25 +7,24 @@ import base64
 import difflib
 import hashlib
 from datetime import datetime
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends
 from pydantic import BaseModel
 from typing import List, Optional
-from sqlite3 import Connection
-from google import genai
-from google.genai import types
+from sqlalchemy.orm import Session
+import google.generativeai as genai
 
 from app.config import settings
-from app.database import get_db_connection
+from app.database import get_db
+from app.models import Party, Inventory, DailySale, Transaction, Bill
+from app.services.auth_service import get_current_merchant_id
 
 logger = logging.getLogger("ShopSathiSnap")
 router = APIRouter()
 
-# Initialize Gemini Client using the new google-genai SDK
 try:
-    gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    genai.configure(api_key=settings.GEMINI_API_KEY)
     logger.info("Gemini client initialized successfully.")
 except Exception as e:
-    gemini_client = None
     logger.error(f"Gemini AI Init Error: {e}")
 
 class SnapEntry(BaseModel):
@@ -47,46 +46,50 @@ class ConfirmPayload(BaseModel):
     bill_type: Optional[str] = None
     entries: List[SnapEntry]
 
-def find_closest_party(conn: Connection, merchant_id: str, parsed_name: str, party_type: str) -> str:
-    cursor = conn.cursor()
-    cursor.execute("SELECT party_id, name FROM parties WHERE merchant_id = ? AND party_type = ?", (merchant_id, party_type))
-    rows = cursor.fetchall()
-    
-    party_names = [r["name"] for r in rows]
+def find_closest_party(db: Session, merchant_id: str, parsed_name: str, party_type: str) -> str:
+    parties = db.query(Party).filter(Party.merchant_id == merchant_id, Party.party_type == party_type).all()
+    party_names = [p.name for p in parties]
     matches = difflib.get_close_matches(parsed_name, party_names, n=1, cutoff=0.8)
     
     if matches:
         matched_name = matches[0]
-        for r in rows:
-            if r["name"] == matched_name:
-                return r["party_id"]
+        for p in parties:
+            if p.name == matched_name:
+                return p.party_id
 
     new_party_id = f"party_{uuid.uuid4().hex[:6]}"
-    cursor.execute(
-        "INSERT INTO parties (party_id, merchant_id, name, party_type, total_balance) VALUES (?, ?, ?, ?, 0.0)",
-        (new_party_id, merchant_id, parsed_name, party_type)
+    new_party = Party(
+        party_id=new_party_id,
+        merchant_id=merchant_id,
+        name=parsed_name,
+        party_type=party_type,
+        total_balance=0.0
     )
+    db.add(new_party)
+    db.flush()
     return new_party_id
 
 @router.post("/process", status_code=status.HTTP_200_OK)
-async def process_notebook_image(merchant_id: str = Form(...), file: UploadFile = File(...)):
+async def process_notebook_image(
+    merchant_id: str = Form(...), 
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    jwt_merchant_id: str = Depends(get_current_merchant_id)
+):
+    if merchant_id != jwt_merchant_id:
+        raise HTTPException(status_code=403, detail="Access Denied")
+        
     logger.info(f"Processing KhataSnap image for merchant: {merchant_id}")
     try:
         image_bytes = await file.read()
         
-        # Save to uploads/ directory so images are accessible via URL
         uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
         os.makedirs(uploads_dir, exist_ok=True)
         filename = f"bill_{uuid.uuid4().hex[:12]}_{file.filename or 'receipt.jpg'}"
         filepath = os.path.join(uploads_dir, filename)
         with open(filepath, "wb") as f:
             f.write(image_bytes)
-        # Store as relative URL path
         image_url_path = f"/uploads/{filename}"
-            
-        base64_image = base64.b64encode(image_bytes).decode('utf-8')
-        image_url = f"data:{file.content_type};base64,{base64_image}"
-
 
         system_instruction = """
 You are a highly accurate OCR system specialized in reading Indian Kirana (grocery) store bills, handwritten ledger pages, and printed invoices.
@@ -143,31 +146,21 @@ CRITICAL RULES:
 - If NO valid items are found, YOU MUST RETURN "is_valid_bill": false and an empty "entries" array.
 """
 
-        # Try models in order of reliability on free tier
-        # gemini-2.5-flash is the most capable and has quota available
-        models_to_try = ["models/gemini-2.5-flash", "models/gemini-2.5-flash-lite", "models/gemini-2.0-flash-lite"]
+        models_to_try = ["models/gemini-2.5-flash", "models/gemini-2.5-flash-lite", "models/gemini-1.5-flash"]
         raw_text = None
         extracted_data = None
         last_error = None
         
-        if gemini_client is None:
-            raise HTTPException(status_code=500, detail="Gemini client not initialized. Check your API key.")
-        
         for attempt, target_model in enumerate(models_to_try):
             try:
-                logger.info(f"Trying OCR with model {target_model} (Attempt {attempt+1})")
-                
-                response = gemini_client.models.generate_content(
-                    model=target_model,
-                    contents=[
-                        system_instruction,
-                        types.Part.from_bytes(data=image_bytes, mime_type=file.content_type)
-                    ]
-                )
+                model = genai.GenerativeModel(model_name=target_model, system_instruction=system_instruction)
+                response = model.generate_content([
+                    {"mime_type": file.content_type, "data": image_bytes}
+                ])
+
                 
                 raw_text = response.text.strip()
                 
-                # Robustly extract JSON block
                 if "```json" in raw_text:
                     raw_text = raw_text.split("```json")[1].split("```")[0].strip()
                 elif "```" in raw_text:
@@ -191,29 +184,22 @@ CRITICAL RULES:
                     extracted_data = {}
                 
                 last_error = None
-                break # Success! Break out of the retry loop
+                break
                 
             except json.JSONDecodeError as je:
-                logger.error(f"JSON Parse Error on {target_model}: {je}. Text: {raw_text}")
                 last_error = ("json_parse", str(je))
-                # Try next model
             except Exception as e:
                 error_str = str(e)
-                logger.error(f"OCR model {target_model} failed: {error_str}")
-                # Detect auth/invalid key errors — no point retrying other models
                 if "API_KEY_INVALID" in error_str or "invalid api key" in error_str.lower() or "401" in error_str or "403" in error_str or "UNAUTHENTICATED" in error_str:
                     last_error = ("auth_error", error_str)
-                    break  # Auth errors won't be fixed by retrying another model
+                    break
                 elif "429" in error_str or "quota" in error_str.lower() or "rate_limit" in error_str.lower() or "RESOURCE_EXHAUSTED" in error_str:
                     last_error = ("rate_limit", error_str)
-                    # Continue to try next model
                 else:
                     last_error = ("general", error_str)
-                    # Continue to try next model
             
         if last_error is not None:
             err_type, err_msg = last_error
-            logger.error(f"All OCR models failed. Last error type: {err_type}, msg: {err_msg}")
             if err_type == "auth_error":
                 raise HTTPException(status_code=401, detail="GEMINI_API_KEY is invalid. Please update your API key in the backend .env file.")
             elif err_type == "rate_limit":
@@ -223,13 +209,10 @@ CRITICAL RULES:
                 
         extracted_data['image_path'] = image_url_path
         
-        if not extracted_data.get('is_valid_bill', True): # Default to True if missing
+        if not extracted_data.get('is_valid_bill', True):
             return {"status": "SUCCESS", "data": extracted_data}
             
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT item_name FROM inventory WHERE merchant_id = ?", (merchant_id,))
-        inventory_items = [r["item_name"] for r in cursor.fetchall()]
+        inventory_items = [i.item_name for i in db.query(Inventory).filter(Inventory.merchant_id == merchant_id).all()]
         
         entries_list = extracted_data.get('entries') or []
         valid_entries = []
@@ -254,20 +237,21 @@ CRITICAL RULES:
         is_duplicate = False
         items_hash = hashlib.md5(json.dumps([str(e.get('item_name')) for e in valid_entries]).encode()).hexdigest()
         
-        cursor.execute(
-            "SELECT bill_id FROM bills WHERE merchant_id = ? AND total_amount = ? AND items_hash = ?",
-            (merchant_id, extracted_data.get('total_amount'), items_hash)
-        )
-        if cursor.fetchone():
+        existing_bill = db.query(Bill).filter(
+            Bill.merchant_id == merchant_id,
+            Bill.total_amount == extracted_data.get('total_amount'),
+            Bill.items_hash == items_hash
+        ).first()
+        
+        if existing_bill:
             is_duplicate = True
             
         extracted_data['is_duplicate'] = is_duplicate
-        conn.close()
 
         return {"status": "SUCCESS", "data": extracted_data}
         
     except HTTPException:
-        raise  # Re-raise our own HTTP exceptions
+        raise
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Snap Process Error: {error_msg}")
@@ -278,70 +262,85 @@ CRITICAL RULES:
         raise HTTPException(status_code=500, detail="Could not process the image via Gemini Vision.")
 
 @router.post("/confirm", status_code=status.HTTP_200_OK)
-async def confirm_snap_entries(payload: ConfirmPayload):
-    conn = get_db_connection()
-    cursor = conn.cursor()
+async def confirm_snap_entries(payload: ConfirmPayload, db: Session = Depends(get_db), jwt_merchant_id: str = Depends(get_current_merchant_id)):
+    if payload.merchant_id != jwt_merchant_id:
+        raise HTTPException(status_code=403, detail="Access Denied")
+        
     try:
         party_id = None
         if payload.party_name and payload.bill_type and payload.bill_type != 'UNKNOWN':
-            party_id = find_closest_party(conn, payload.merchant_id, payload.party_name, payload.bill_type)
+            party_id = find_closest_party(db, payload.merchant_id, payload.party_name, payload.bill_type)
             
         items_hash = hashlib.md5(json.dumps([e.item_name for e in payload.entries]).encode()).hexdigest()
         bill_id = f"bill_{uuid.uuid4().hex[:8]}"
         
-        cursor.execute(
-            "INSERT INTO bills (bill_id, merchant_id, party_id, bill_type, total_amount, bill_date, image_path, items_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (bill_id, payload.merchant_id, party_id, payload.bill_type or 'UNKNOWN', payload.total_amount, payload.bill_date or datetime.now().strftime('%Y-%m-%d'), payload.image_path, items_hash)
+        new_bill = Bill(
+            bill_id=bill_id,
+            merchant_id=payload.merchant_id,
+            party_id=party_id,
+            bill_type=payload.bill_type or 'UNKNOWN',
+            total_amount=payload.total_amount,
+            bill_date=payload.bill_date or datetime.now().strftime('%Y-%m-%d'),
+            image_path=payload.image_path,
+            items_hash=items_hash
         )
+        db.add(new_bill)
         
         party_khata_updates = {}
+        
+        inventory_items = db.query(Inventory).filter(Inventory.merchant_id == payload.merchant_id).all()
+        item_names = [i.item_name for i in inventory_items]
         
         for entry in payload.entries:
             qty = float(entry.quantity) if entry.quantity else 1.0
             amt = float(entry.amount) if entry.amount is not None else (qty * float(entry.rate or 0.0))
 
-            # 1. Update Stock Inventory
-            cursor.execute(
-                "SELECT item_id, item_name, current_stock FROM inventory WHERE merchant_id = ?",
-                (payload.merchant_id,)
-            )
-            rows = cursor.fetchall()
-            item_names = [r["item_name"] for r in rows]
             matches = difflib.get_close_matches(entry.item_name, item_names, n=1, cutoff=0.8)
-            
             is_addition = entry.action in ["ADD_STOCK", "SUPPLIER_CREDIT"]
             qty_change = qty if is_addition else -qty
             
             if matches:
                 matched_name = matches[0]
-                for r in rows:
-                    if r["item_name"] == matched_name:
-                        new_stock = max(0, r["current_stock"] + qty_change)
-                        cursor.execute("UPDATE inventory SET current_stock = ? WHERE item_id = ?", (new_stock, r["item_id"]))
+                for r in inventory_items:
+                    if r.item_name == matched_name:
+                        r.current_stock = max(0, r.current_stock + qty_change)
                         break
             else:
                 new_item_id = f"item_{uuid.uuid4().hex[:6]}"
                 new_stock = qty if is_addition else 0
-                cursor.execute(
-                    "INSERT INTO inventory (item_id, merchant_id, item_name, current_stock, reorder_level, price, entry_source) VALUES (?, ?, ?, ?, 10.0, ?, ?)",
-                    (new_item_id, payload.merchant_id, entry.item_name, new_stock, float(entry.rate or 0.0), "KhataSnap")
+                new_item = Inventory(
+                    item_id=new_item_id,
+                    merchant_id=payload.merchant_id,
+                    item_name=entry.item_name,
+                    current_stock=new_stock,
+                    reorder_level=10.0,
+                    price=float(entry.rate or 0.0),
+                    entry_source="KhataSnap"
                 )
+                db.add(new_item)
+                inventory_items.append(new_item)
+                item_names.append(entry.item_name)
 
-            # Insert into daily_sales
             sale_id = f"sale_{uuid.uuid4().hex[:10]}"
             sale_type = "PURCHASE" if is_addition else "SALE"
             note = f"Bill Snap {sale_type}" + (f" ({payload.party_name})" if payload.party_name else "")
-            cursor.execute(
-                "INSERT INTO daily_sales (sale_id, merchant_id, type, item, qty, amount, note, entry_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (sale_id, payload.merchant_id, sale_type, entry.item_name, qty, amt, note, "KhataSnap")
+            
+            new_sale = DailySale(
+                sale_id=sale_id,
+                merchant_id=payload.merchant_id,
+                type=sale_type,
+                item=entry.item_name,
+                qty=qty,
+                amount=amt,
+                note=note,
+                entry_source="KhataSnap"
             )
+            db.add(new_sale)
 
-            # 2. Track Khata Updates
-            # Handle explicit credit/repayment actions
             if "CREDIT" in entry.action or "REPAYMENT" in entry.action:
                 p_type = "SUPPLIER" if "SUPPLIER" in entry.action else "CUSTOMER"
                 p_name_target = entry.target_name if entry.target_name else (payload.party_name or "General")
-                p_id = party_id if party_id else find_closest_party(conn, payload.merchant_id, p_name_target, p_type)
+                p_id = party_id if party_id else find_closest_party(db, payload.merchant_id, p_name_target, p_type)
                 
                 if p_id not in party_khata_updates:
                     party_khata_updates[p_id] = {
@@ -350,7 +349,7 @@ async def confirm_snap_entries(payload: ConfirmPayload):
                         'txn_type': "GIVEN" if (entry.action == "CUSTOMER_CREDIT" or entry.action == "SUPPLIER_PAYMENT") else "GOT"
                     }
                 party_khata_updates[p_id]['amount'] += amt
-            # Handle ADD_STOCK (supplier purchase) and REDUCE_STOCK (customer sale) by bill_type
+                
             elif entry.action in ["ADD_STOCK", "REDUCE_STOCK"]:
                 if party_id and payload.party_name:
                     is_supplier_purchase = payload.bill_type == "SUPPLIER" and entry.action == "ADD_STOCK"
@@ -360,43 +359,37 @@ async def confirm_snap_entries(payload: ConfirmPayload):
                         if party_id not in party_khata_updates:
                             party_khata_updates[party_id] = {
                                 'amount': 0.0,
-                                'is_credit': True,  # Balance increases (we owe supplier / customer owes us)
+                                'is_credit': True,
                                 'txn_type': "GIVEN" if is_customer_sale else "GOT"
                             }
                         party_khata_updates[party_id]['amount'] += amt
 
-        # 3. Apply consolidated Khata Updates
         for p_id, p_data in party_khata_updates.items():
             if p_data['amount'] > 0:
                 balance_change = p_data['amount'] if p_data['is_credit'] else -p_data['amount']
                 txn_id = f"txn_{uuid.uuid4().hex[:6]}"
                 txn_type = "GIVEN" if payload.bill_type == "CUSTOMER" else "GOT"
-                cursor.execute(
-                    "INSERT INTO transactions (transaction_id, party_id, merchant_id, amount, txn_type, entry_source, voice_transcript, image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (txn_id, p_id, payload.merchant_id, p_data['amount'], txn_type, "KhataSnap", f"Bill ID: {bill_id}", payload.image_path)
-                )
-                cursor.execute(
-                    "UPDATE parties SET total_balance = total_balance + ? WHERE party_id = ?",
-                    (balance_change, p_id)
-                )
                 
-        conn.commit()
-        
-        from app.routes.notifications import generate_notification
-        generate_notification(
-            merchant_id=payload.merchant_id,
-            title="KhataSnap Processed",
-            message=f"Bill of ₹{payload.total_amount} processed and items added.",
-            type="success",
-            category="System",
-            reference_id=bill_id,
-            reference_type="BILL"
-        )
+                new_txn = Transaction(
+                    transaction_id=txn_id,
+                    party_id=p_id,
+                    merchant_id=payload.merchant_id,
+                    amount=p_data['amount'],
+                    txn_type=txn_type,
+                    entry_source="KhataSnap",
+                    voice_transcript=f"Bill ID: {bill_id}",
+                    image_path=payload.image_path
+                )
+                db.add(new_txn)
+                
+                party = db.query(Party).filter(Party.party_id == p_id).first()
+                if party:
+                    party.total_balance += balance_change
+                
+        db.commit()
         
         return {"status": "SUCCESS", "msg": "Bill successfully digitized.", "bill_id": bill_id}
     except Exception as e:
-        conn.rollback()
+        db.rollback()
         logger.error(f"KhataSnap DB Error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to save bill entries.")
-    finally:
-        conn.close()
