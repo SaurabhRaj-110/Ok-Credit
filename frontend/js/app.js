@@ -27,7 +27,7 @@ window.fetch = async function() {
             console.error("App Error: " + message + " at line " + lineno);
             return true;
         };
-        const RENDER_API_URL = "https://ok-credit.onrender.com";
+        const RENDER_API_URL = "https://shopsathi-api.onrender.com";
         let MERCHANT_ID = localStorage.getItem('shopsathi_merchant_id') || "";
         let MERCHANT_ROLE = localStorage.getItem('shopsathi_role') || "";
         

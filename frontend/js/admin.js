@@ -1,7 +1,7 @@
 
 
 
-const RENDER_API_URL = ''; // using relative or setup via env
+const RENDER_API_URL = 'https://shopsathi-api.onrender.com'; // using relative or setup via env
 
 function logoutAdmin() {
     localStorage.clear();
