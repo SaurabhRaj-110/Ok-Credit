@@ -3,5 +3,8 @@ python-multipart
 uvicorn
 pydantic
 pydantic-settings
-google-genai
+google-generativeai
 groq
+sqlalchemy
+PyJWT
+python-dotenv
