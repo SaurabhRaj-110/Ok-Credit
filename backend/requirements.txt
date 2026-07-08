@@ -8,3 +8,4 @@ groq
 sqlalchemy
 PyJWT
 python-dotenv
+psycopg2-binary
