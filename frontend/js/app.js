@@ -179,26 +179,21 @@ window.fetch = async function() {
             try {
                 let res = await fetch(`${RENDER_API_URL}/api/usage/track`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem('shopsathi_auth_token')
+                    },
                     body: JSON.stringify({ merchant_id: MERCHANT_ID, action: action })
                 });
                 let data = await res.json();
                 if (data.status === 'SUCCESS') {
                     if (action === 'login') {
                         // Update UI with streak
-                        let streakCard = document.getElementById('homeStreakCard');
-                        if (streakCard) {
-                            document.getElementById('homeStreakDays').innerText = `${data.current_streak} Days`;
-                            document.getElementById('menuStreakBadge').innerText = `${data.current_streak} Days`;
-                            
-                            // Badges
-                            let title = "Starter";
-                            if (data.current_streak >= 90) title = "Champion 👑";
-                            else if (data.current_streak >= 30) title = "Power Merchant 💎";
-                            else if (data.current_streak >= 15) title = "Smart Merchant 🏅";
-                            else if (data.current_streak >= 7) title = "Consistent 🎯";
-                            document.getElementById('homeStreakTitle').innerHTML = `Your Daily Streak • <span style="color:var(--primary);">${title}</span>`;
+                        let drawerStreak = document.getElementById('drawerStreakDays');
+                        if (drawerStreak) {
+                            drawerStreak.innerText = `${data.current_streak} Days 🔥`;
                         }
+                        // End streak update
                     }
                 }
             } catch (e) {
@@ -4366,11 +4361,7 @@ window.fetch = async function() {
             initShopSathi();
             
             // Track login to update streak on reload
-            fetch(`${RENDER_API_URL}/api/usage/track`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ merchant_id: MERCHANT_ID, action: 'login' })
-            }).catch(e => console.error("Streak tracking error on load", e));
+            trackUsage('login');
         }
         
         function logoutMerchant() {

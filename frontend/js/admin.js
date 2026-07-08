@@ -1,4 +1,12 @@
 
+async function adminFetch(url) {
+    return await fetch(url, {
+        headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('shopsathi_auth_token')
+        }
+    });
+}
+
 
 
 const RENDER_API_URL = 'https://shopsathi-api.onrender.com'; // using relative or setup via env
@@ -20,7 +28,7 @@ async function loadDashboard() {
     document.getElementById('currentDateDisplay').innerText = new Date().toLocaleDateString('en-GB', dateOptions);
 
     try {
-        const res = await fetch(`${RENDER_API_URL}/api/admin/dashboard`);
+        const res = await adminFetch(`${RENDER_API_URL}/api/admin/dashboard`);
         const data = await res.json();
         if (data.status === 'SUCCESS') {
             const ov = data.overview;
@@ -195,7 +203,7 @@ function loadTabData(viewId) {
 
 async function loadMerchantsView() {
     try {
-        const res = await fetch(`${RENDER_API_URL}/api/admin/dashboard`);
+        const res = await adminFetch(`${RENDER_API_URL}/api/admin/dashboard`);
         const data = await res.json();
         const tbody = document.getElementById('fullMerchantsTableBody');
         tbody.innerHTML = '';
@@ -216,7 +224,7 @@ async function loadMerchantsView() {
 
 async function loadStreaksView() {
     try {
-        const res = await fetch(`${RENDER_API_URL}/api/admin/streaks`);
+        const res = await adminFetch(`${RENDER_API_URL}/api/admin/streaks`);
         const data = await res.json();
         const tbody = document.getElementById('streaksTableBody');
         tbody.innerHTML = '';
@@ -233,7 +241,7 @@ async function loadStreaksView() {
 
 async function loadTransactionsView() {
     try {
-        const res = await fetch(`${RENDER_API_URL}/api/admin/transactions`);
+        const res = await adminFetch(`${RENDER_API_URL}/api/admin/transactions`);
         const data = await res.json();
         const tbody = document.getElementById('transactionsTableBody');
         tbody.innerHTML = '';
@@ -252,7 +260,7 @@ async function loadTransactionsView() {
 
 async function loadBillsView() {
     try {
-        const res = await fetch(`${RENDER_API_URL}/api/admin/bills`);
+        const res = await adminFetch(`${RENDER_API_URL}/api/admin/bills`);
         const data = await res.json();
         const tbody = document.getElementById('billsTableBody');
         tbody.innerHTML = '';
@@ -270,7 +278,7 @@ async function loadBillsView() {
 
 async function loadVoiceCommandsView() {
     try {
-        const res = await fetch(`${RENDER_API_URL}/api/admin/voice-commands`);
+        const res = await adminFetch(`${RENDER_API_URL}/api/admin/voice-commands`);
         const data = await res.json();
         const tbody = document.getElementById('voiceTableBody');
         tbody.innerHTML = '';
@@ -287,7 +295,7 @@ async function loadVoiceCommandsView() {
 
 async function loadInventoryView() {
     try {
-        const res = await fetch(`${RENDER_API_URL}/api/admin/inventory`);
+        const res = await adminFetch(`${RENDER_API_URL}/api/admin/inventory`);
         const data = await res.json();
         const tbody = document.getElementById('inventoryTableBody');
         tbody.innerHTML = '';
@@ -305,7 +313,7 @@ async function loadInventoryView() {
 
 async function loadAlertsView() {
     try {
-        const res = await fetch(`${RENDER_API_URL}/api/admin/alerts`);
+        const res = await adminFetch(`${RENDER_API_URL}/api/admin/alerts`);
         const data = await res.json();
         const tbody = document.getElementById('alertsTableBody');
         tbody.innerHTML = '';
