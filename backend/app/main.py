@@ -46,8 +46,9 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(usage.router, prefix="/api/usage", tags=["Usage Tracking"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin Dashboard"])
 
-os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+from app.config import settings
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 @app.on_event("startup")
 def on_startup():

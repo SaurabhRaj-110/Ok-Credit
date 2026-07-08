@@ -81,15 +81,20 @@ async def process_notebook_image(
         
     logger.info(f"Processing KhataSnap image for merchant: {merchant_id}")
     try:
-        image_bytes = await file.read()
-        
-        uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
+        file_ext = os.path.splitext(file.filename)[1]
+        if not file_ext:
+            file_ext = ".jpg"
+        filename = f"ocr_{uuid.uuid4().hex[:10]}_{int(time.time())}{file_ext}"
+        uploads_dir = os.path.join(settings.UPLOAD_DIR, "snap")
         os.makedirs(uploads_dir, exist_ok=True)
-        filename = f"bill_{uuid.uuid4().hex[:12]}_{file.filename or 'receipt.jpg'}"
+        
         filepath = os.path.join(uploads_dir, filename)
-        with open(filepath, "wb") as f:
-            f.write(image_bytes)
-        image_url_path = f"/uploads/{filename}"
+        
+        image_url_path = f"/uploads/snap/{filename}"
+        
+        image_bytes = await file.read()
+        with open(filepath, "wb") as buffer:
+            buffer.write(image_bytes)
 
         system_instruction = """
 You are a highly accurate OCR system specialized in reading Indian Kirana (grocery) store bills, handwritten ledger pages, and printed invoices.

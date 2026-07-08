@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form, Depends
+from app.config import settings
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -31,17 +32,17 @@ async def upload_evidence(
         raise HTTPException(status_code=403, detail="Access Denied")
         
     try:
-        os.makedirs("uploads/evidence", exist_ok=True)
-        file_ext = os.path.splitext(file.filename)[1]
-        if not file_ext:
-            file_ext = ".jpg"
-        filename = f"evd_{uuid.uuid4().hex[:10]}_{int(time.time())}{file_ext}"
-        filepath = os.path.join("uploads", "evidence", filename)
+        evidence_dir = os.path.join(settings.UPLOAD_DIR, "evidence")
+        os.makedirs(evidence_dir, exist_ok=True)
         
-        with open(filepath, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
+        # Save file
+        filename = f"{merchant_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}"
+        filepath = os.path.join(evidence_dir, filename)
+        
+        with open(filepath, "wb") as f:
+            f.write(await file.read())
             
+        # Return accessible URL
         evidence_id = "evd_" + str(uuid.uuid4().hex)[:10]
         image_path = f"/uploads/evidence/{filename}"
         
