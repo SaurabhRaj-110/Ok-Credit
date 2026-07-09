@@ -2802,6 +2802,9 @@ window.fetch = async function() {
                     try {
                         let res = await fetch(`${RENDER_API_URL}/api/snap/process`, {
                             method: 'POST',
+                            headers: {
+                                'Authorization': 'Bearer ' + localStorage.getItem('shopsathi_auth_token')
+                            },
                             body: formData
                         });
                         
