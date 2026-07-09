@@ -171,8 +171,22 @@ CRITICAL RULES:
                 elif "```" in raw_text:
                     raw_text = raw_text.split("```")[1].split("```")[0].strip()
                     
-                start_idx = raw_text.find('{')
-                end_idx = raw_text.rfind('}')
+                start_dict = raw_text.find('{')
+                start_list = raw_text.find('[')
+                
+                if start_dict == -1 and start_list == -1:
+                    start_idx = -1
+                elif start_dict == -1:
+                    start_idx = start_list
+                elif start_list == -1:
+                    start_idx = start_dict
+                else:
+                    start_idx = min(start_dict, start_list)
+                    
+                end_dict = raw_text.rfind('}')
+                end_list = raw_text.rfind(']')
+                end_idx = max(end_dict, end_list)
+                
                 if start_idx != -1 and end_idx != -1:
                     raw_text = raw_text[start_idx:end_idx+1]
                     
