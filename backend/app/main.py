@@ -60,21 +60,23 @@ def read_root():
 
 @app.get("/api/migrate-db")
 def migrate_db():
+    errors = []
     try:
         from sqlalchemy import text
         with engine.begin() as conn:
             try:
                 conn.execute(text("ALTER TABLE bills ADD COLUMN party_id VARCHAR;"))
-            except Exception:
-                pass
+            except Exception as e:
+                errors.append(f"party_id error: {str(e)}")
             try:
                 conn.execute(text("ALTER TABLE bills ADD COLUMN image_path VARCHAR;"))
-            except Exception:
-                pass
+            except Exception as e:
+                errors.append(f"image_path error: {str(e)}")
             try:
                 conn.execute(text("ALTER TABLE bills ADD COLUMN items_hash VARCHAR;"))
-            except Exception:
-                pass
-        return {"status": "SUCCESS", "message": "Migration applied"}
+            except Exception as e:
+                errors.append(f"items_hash error: {str(e)}")
+        
+        return {"status": "SUCCESS", "message": "Migration finished", "errors": errors}
     except Exception as e:
-        return {"status": "ERROR", "message": str(e)}
+        return {"status": "ERROR", "message": str(e), "errors": errors}
