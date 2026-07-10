@@ -201,7 +201,10 @@ CRITICAL RULES:
         if groq_client:
             try:
                 b64_image = base64.b64encode(image_bytes).decode("utf-8")
-                mime = file.content_type or "image/jpeg"
+                # Force image/jpeg if vercel sets something odd like application/octet-stream
+                mime = "image/jpeg"
+                if file.content_type and "image" in file.content_type:
+                    mime = file.content_type
                 
                 groq_response = groq_client.chat.completions.create(
                     model="meta-llama/llama-4-scout-17b-16e-instruct",
@@ -237,9 +240,9 @@ CRITICAL RULES:
         if extracted_data is None:
             gemini_models = [
                 "models/gemini-2.5-flash",
+                "models/gemini-1.5-flash",
                 "models/gemini-2.0-flash",
-                "models/gemini-flash-latest",
-                "models/gemini-2.5-flash-lite"
+                "models/gemini-flash-latest"
             ]
             for target_model in gemini_models:
                 try:
@@ -254,7 +257,8 @@ CRITICAL RULES:
                     logger.info(f"OCR successful via Gemini ({target_model})")
                     break
                 except json.JSONDecodeError as je:
-                    last_error = ("json_parse", str(je))
+                    if not last_error or last_error[0] not in ["rate_limit", "auth_error"]:
+                        last_error = ("json_parse", f"Gemini returned invalid JSON: {str(je)}")
                 except Exception as e:
                     error_str = str(e)
                     if "API_KEY_INVALID" in error_str or "invalid api key" in error_str.lower() or "401" in error_str or "403" in error_str or "UNAUTHENTICATED" in error_str:
@@ -263,7 +267,7 @@ CRITICAL RULES:
                     elif "429" in error_str or "quota" in error_str.lower() or "rate_limit" in error_str.lower() or "RESOURCE_EXHAUSTED" in error_str:
                         last_error = ("rate_limit", error_str)
                     else:
-                        if not last_error or last_error[0] != "rate_limit":
+                        if not last_error or last_error[0] not in ["rate_limit", "auth_error"]:
                             last_error = ("general", error_str)
 
         # ===== ERROR HANDLING =====
