@@ -331,11 +331,7 @@ CRITICAL RULES:
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Snap Process Error: {error_msg}")
-        if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
-            raise HTTPException(status_code=429, detail="Gemini API rate limit exceeded. Please wait a minute and try again.")
-        if "API_KEY_INVALID" in error_msg or "401" in error_msg:
-            raise HTTPException(status_code=401, detail="GEMINI_API_KEY is invalid. Please update your API key.")
-        raise HTTPException(status_code=500, detail="Could not process the image. Please try again.")
+        raise HTTPException(status_code=500, detail=f"System error: {error_msg}")
 
 @router.post("/confirm", status_code=status.HTTP_200_OK)
 async def confirm_snap_entries(payload: ConfirmPayload, db: Session = Depends(get_db), jwt_merchant_id: str = Depends(get_current_merchant_id)):
