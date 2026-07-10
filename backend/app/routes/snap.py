@@ -98,27 +98,25 @@ async def process_notebook_image(
             buffer.write(image_bytes)
 
         system_instruction = """
-You are a highly accurate OCR system specialized in reading Indian Kirana (grocery) store bills, handwritten ledger pages, and printed invoices.
+You are a highly accurate OCR system. Your job is to extract ANY handwritten or printed grocery items, names, and phone numbers from the image.
 
 ANALYZE this image carefully.
 
-STEP 1: Determine if this is a valid bill/invoice/ledger. If not (e.g., random photo, scenery, face), return: {"is_valid_bill": false, "entries": []}
-
-STEP 2: If valid, read EVERY line item with extreme care:
+STEP 1: Read EVERY line item with extreme care:
 - Read handwritten text character by character
-- For Hindi/Devanagari text, transliterate to English (e.g., मैगी → Maggi, आटा → Atta, चीनी → Sugar)
+- For Hindi/Devanagari text, transliterate to English (e.g., आटा -> Atta)
 - For quantities: look for numbers near items (e.g., "2 kg", "3 pkt", "500g")
 - For rates/prices: look for ₹ symbol, "Rs", or numbers after items
-- For amounts: quantity × rate, or the total next to each line
+- For amounts: quantity x rate, or the total next to each line
 - Handle common kirana abbreviations: pkt=packet, kg=kilogram, ltr=litre, dz=dozen
 
-STEP 3: MULTIPLE PARTIES & MISSING AMOUNTS:
+STEP 2: MULTIPLE PARTIES & MISSING AMOUNTS:
 - A single image may contain multiple sections for DIFFERENT parties (e.g., a customer on top, a supplier below).
-- Identify the party name for EACH line item and assign it to "target_name".
-- Determine if the party is buying from the merchant ("CUSTOMER_CREDIT") or selling to the merchant ("SUPPLIER_CREDIT").
-- If amounts or rates are completely missing, set them to null. Do NOT hallucinate prices.
+- Identify the party name for EACH line item and assign it to "target_name" (e.g. "Saurabh Raj").
+- If a phone number is present, you may include it in the target_name (e.g. "Saurabh Raj 9142150520").
+- If amounts or rates are missing, set them to 0.0 or null. Do NOT hallucinate prices.
 
-STEP 4: Estimate confidence for each item (0-100):
+STEP 3: Estimate confidence for each item (0-100):
 - Clear printed text: 95-100
 - Clear handwriting: 85-95  
 - Unclear/smudged text: 60-84
@@ -145,14 +143,14 @@ Return ONLY valid JSON (no markdown wrappers, no ```json blocks):
 }
 
 CRITICAL RULES:
-- READ the actual text in the image. Do NOT hallucinate or invent items or prices.
-- If an image shows multiple parties, create entries for ALL of them and accurately tag their "target_name" and "action".
-- Common Indian grocery items: Maggi, Parle-G, Amul, Britannia, Atta (flour), Chawal (rice), Dal, Chini (sugar), Tel (oil), Namak (salt), Doodh (milk), Sabun (soap), Masala.
+- YOU MUST ALWAYS RETURN is_valid_bill: true if there is ANY readable text in the image.
+- YOU MUST EXTRACT EVERY SINGLE LINE OF TEXT AS AN ENTRY.
+- If action is unknown, use "REDUCE_STOCK".
+- Do NOT hallucinate or invent items or prices.
 - Each entry should have at minimum: item_name.
-- If NO valid items are found, YOU MUST RETURN "is_valid_bill": false and an empty "entries" array.
 """
 
-        models_to_try = ["models/gemini-2.5-flash", "models/gemini-2.5-flash-lite", "models/gemini-1.5-flash"]
+        models_to_try = ["models/gemini-2.5-flash", "models/gemini-2.5-flash-lite", "models/gemini-2.0-flash"]
         raw_text = None
         extracted_data = None
         last_error = None
