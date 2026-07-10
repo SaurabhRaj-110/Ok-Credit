@@ -1318,6 +1318,16 @@ window.fetch = async function() {
                         amount: act.amount || 0,
                         isNewPerson: !matchedPerson
                     });
+                } else if (act.action === "DAILY_SALES") {
+                    parsedActions.push({
+                        actionType: 'STOCK',
+                        type: 'SALE',
+                        itemName: 'Daily Sales (Voice)',
+                        qty: 1,
+                        unit: 'items',
+                        total: act.amount || 0,
+                        itemObj: null
+                    });
                 }
             });
 

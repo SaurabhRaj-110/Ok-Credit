@@ -43,13 +43,14 @@ class GroqEngine:
            MUST return TWO actions: 
            - {{"action": "CUSTOMER_PAYMENT", "target_name": "Saloni", "party_type": "CUSTOMER", "amount": 2000}}
            - {{"action": "CUSTOMER_CREDIT", "target_name": "Saurabh Raj", "party_type": "CUSTOMER", "amount": 200}}
+        11. "DAILY_SALES": When user mentions today's total sales / galla (e.g., "aaj ki sales 500 rupees", "aaj ka galla 500", "aaj 500 ka sale hua"). Returns total amount as `amount`.
 
         The user may speak multiple commands at once (e.g., "5 packet maggi becha aur rahul ne 50 rupaye diye").
         Return a JSON object with an 'actions' key containing an array of objects representing each action:
         {{
           "actions": [
             {{
-                "action": "CUSTOMER_PAYMENT" | "CUSTOMER_CREDIT" | "SUPPLIER_PAYMENT" | "SUPPLIER_CREDIT" | "ADD_STOCK" | "REDUCE_STOCK" | "NAVIGATE_STOCK" | "NAVIGATE_KHATA" | "NAVIGATE_SNAP" | "UNKNOWN",
+                "action": "CUSTOMER_PAYMENT" | "CUSTOMER_CREDIT" | "SUPPLIER_PAYMENT" | "SUPPLIER_CREDIT" | "ADD_STOCK" | "REDUCE_STOCK" | "NAVIGATE_STOCK" | "NAVIGATE_KHATA" | "NAVIGATE_SNAP" | "DAILY_SALES" | "UNKNOWN",
                 "item_name": string or null,
                 "quantity": float or null,
                 "unit": string or null,

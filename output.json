@@ -1,0 +1,47 @@
+```json
+{
+  "is_valid_bill": true,
+  "party_name": "Saurabh Raj",
+  "bill_type": "CUSTOMER",
+  "total_amount": null,
+  "bill_date": null,
+  "entries": [
+    {
+      "action": "REDUCE_STOCK",
+      "target_name": "Saurabh Raj 9142150520",
+      "amount": null,
+      "item_name": "Amul Doodh",
+      "quantity": 2.0,
+      "rate": null,
+      "confidence_score": 92.0
+    },
+    {
+      "action": "REDUCE_STOCK",
+      "target_name": "Saurabh Raj 9142150520",
+      "amount": null,
+      "item_name": "Maggi (Nestle)",
+      "quantity": 10.0,
+      "rate": null,
+      "confidence_score": 93.0
+    },
+    {
+      "action": "REDUCE_STOCK",
+      "target_name": "Saurabh Raj 9142150520",
+      "amount": null,
+      "item_name": "Parle-G Biscuit",
+      "quantity": 6.0,
+      "rate": null,
+      "confidence_score": 93.0
+    },
+    {
+      "action": "REDUCE_STOCK",
+      "target_name": "Saurabh Raj 9142150520",
+      "amount": null,
+      "item_name": "Navratna mixture",
+      "quantity": 500.0,
+      "rate": null,
+      "confidence_score": 90.0
+    }
+  ]
+}
+```

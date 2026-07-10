@@ -81,6 +81,26 @@ async def process_voice_command(payload: VoiceRequest, db: Session = Depends(get
                 change_str = f"-{qty}" if action == "REDUCE_STOCK" else f"+{qty}"
                 actions_processed.append(f"{item_name} {verb}: {change_str} units{amount_str}.")
                 
+            elif action == "DAILY_SALES":
+                amount = ai_result.get("amount")
+                if not amount:
+                    continue
+                
+                from app.models import DailySale
+                new_sale = DailySale(
+                    merchant_id=payload.merchant_id,
+                    type="Cash Sale",
+                    item="Daily Sales (Voice)",
+                    qty=1.0,
+                    amount=amount,
+                    note="Added via Voice",
+                    entry_source="Voice AI"
+                )
+                db.add(new_sale)
+                db.flush()
+                
+                actions_processed.append(f"Aaj ki sales mein ₹{amount} add ho gaye.")
+                
         if not actions_processed:
              return {"status": "TRY_AGAIN", "msg": "Saman ya naam samajh nahi aaya."}
              
