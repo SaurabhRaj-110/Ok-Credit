@@ -13,7 +13,11 @@ from pydantic import BaseModel
 from typing import List, Optional
 from sqlalchemy.orm import Session
 import google.generativeai as genai
-from groq import Groq
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
+    logging.getLogger("ShopSathiSnap").warning("Groq SDK not installed. Groq OCR will be unavailable.")
 
 from app.config import settings
 from app.database import get_db
@@ -25,11 +29,16 @@ router = APIRouter()
 
 # Initialize Groq client (primary OCR provider - Llama 4 Scout Vision)
 groq_client = None
-try:
-    groq_client = Groq(api_key=settings.GROQ_API_KEY)
-    logger.info("Groq client initialized successfully.")
-except Exception as e:
-    logger.error(f"Groq AI Init Error: {e}")
+if Groq is not None:
+    try:
+        api_key = settings.GROQ_API_KEY
+        if api_key and api_key != "MOCK_KEY_FOR_LOCAL_DEV":
+            groq_client = Groq(api_key=api_key)
+            logger.info("Groq client initialized successfully.")
+        else:
+            logger.warning("GROQ_API_KEY not set, Groq OCR unavailable.")
+    except Exception as e:
+        logger.error(f"Groq AI Init Error: {e}")
 
 # Initialize Gemini client (fallback OCR provider)
 try:
@@ -322,7 +331,7 @@ CRITICAL RULES:
             raise HTTPException(status_code=429, detail="Gemini API rate limit exceeded. Please wait a minute and try again.")
         if "API_KEY_INVALID" in error_msg or "401" in error_msg:
             raise HTTPException(status_code=401, detail="GEMINI_API_KEY is invalid. Please update your API key.")
-        raise HTTPException(status_code=500, detail="Could not process the image via Gemini Vision.")
+        raise HTTPException(status_code=500, detail="Could not process the image. Please try again.")
 
 @router.post("/confirm", status_code=status.HTTP_200_OK)
 async def confirm_snap_entries(payload: ConfirmPayload, db: Session = Depends(get_db), jwt_merchant_id: str = Depends(get_current_merchant_id)):
