@@ -266,6 +266,9 @@ CRITICAL RULES:
                 raise HTTPException(status_code=429, detail="AI rate limit exceeded. Please wait a minute and try again.")
             else:
                 raise HTTPException(status_code=500, detail="Could not process the image. Please try again.")
+        
+        if extracted_data is None:
+            raise HTTPException(status_code=500, detail="No OCR provider available. Please try again later.")
                 
         extracted_data['image_path'] = image_url_path
         
