@@ -15,7 +15,7 @@ ShopSathi AI is a voice and vision-first Progressive Web App (PWA) designed to e
 - **Voice Munim (Powered by Groq LPUs):** Natural Hinglish voice commands. The merchant taps the mic and says "Suresh ka 500 udhaar likh do" or "Maggi packets add karo". Using Llama-3.3-70B on Groq, the AI identifies the intent and updates customer balances or inventory **instantly**, bypassing traditional API bottlenecks.
 - **KhataSnap AI (Powered by Gemini Vision):** Merchants take a photo of their daily handwritten ledger. The system parses customer names, items, quantities, and total amounts, digitizing bulk offline entries in seconds.
 - **Dynamic Daily Log:** An interactive, filterable ledger that tracks "Aaj ki Sales" (Today's Sales), Udhaar, and Purchase records. Allows users to switch dates seamlessly while preserving live real-time sync for current transactions.
-- **Instant-Boot & Optimistic UI:** Engineered to combat spotty Jio/Airtel 4G networks in Uttar Pradesh. The app loads instantly from local storage, visually registers transactions immediately, and secretly syncs to the backend via background etch() calls.
+- **Instant-Boot & Optimistic UI:** Engineered to combat spotty Jio/Airtel 4G networks in Uttar Pradesh. The app loads instantly from local storage, visually registers transactions immediately, and secretly syncs to the backend via background fetch() calls.
 - **Smart Reminders:** 1-click, auto-filled WhatsApp payment reminders tied directly to the customer's real-time credit balance.
 
 ## Tech Stack & Architecture
@@ -35,7 +35,7 @@ Identified core merchant friction: 1-2 hours lost daily to manual ledger math. F
 Deployed Python FastAPI backend to Render. Deployed Frontend UI to Netlify. Successfully integrated AI for Voice Intent parsing and Image OCR. Built resilient CSS architecture to prevent mobile-browser WebView collapse.
 
 **Phase 3: V1 in Merchant's Hands & Optimization (Week 5)**
-Conducted live field testing in Kanpur. Gathered initial feedback. Migrated the core NLP engine from Gemini to Groq (Llama 3 70B) to solve rate-limiting issues and achieve instant voice response times. Shipped UI improvements for dynamic date filtering and resilient offline fallback.
+Conducted live field testing in Kanpur. Gathered initial feedback. Migrated the core NLP engine from Gemini to Groq (Llama 3 70B) to solve rate-limiting issues and achieve instant voice response times. Shipped UI improvements for dynamic date filtering and resilient offline fallback. Resolved edge-case frontend login flow bugs enabling seamless OTP entry via browser autofill. Completed end-to-end integration of the KhataSnap OCR functionality, resolving critical schema mismatches and ensuring reliable extraction and processing of ledger imagery to the cloud database.
 
 ---
 
@@ -45,7 +45,7 @@ If you want to run this project locally on your machine:
 
 ### 1. Backend (FastAPI)
 
-`ash
+```bash
 # Clone the repository
 git clone https://github.com/SaurabhRaj-110/Ok-Credit.git
 cd Ok-Credit/backend
@@ -61,12 +61,12 @@ echo "GROQ_API_KEY=your_groq_key_here" >> .env
 
 # Run the server
 uvicorn app.main:app --reload
-`
+```
 
 ### 2. Frontend (HTML/JS)
-You can serve the rontend/index.html file using any static file server like VS Code's Live Server, or by running python's http module inside the rontend directory:
-`ash
+You can serve the frontend/index.html file using any static file server like VS Code's Live Server, or by running python's http module inside the frontend directory:
+```bash
 cd ../frontend
 python -m http.server 5500
-`
+```
 Then visit http://localhost:5500 in your browser. (Note: Make sure the RENDER_API_URL variable in index.html is pointing to http://localhost:8000 for local testing).
