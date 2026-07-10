@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from sqlalchemy.orm import Session
 import google.generativeai as genai
+from groq import Groq
 
 from app.config import settings
 from app.database import get_db
@@ -22,6 +23,15 @@ from app.services.auth_service import get_current_merchant_id
 logger = logging.getLogger("ShopSathiSnap")
 router = APIRouter()
 
+# Initialize Groq client (primary OCR provider - Llama 4 Scout Vision)
+groq_client = None
+try:
+    groq_client = Groq(api_key=settings.GROQ_API_KEY)
+    logger.info("Groq client initialized successfully.")
+except Exception as e:
+    logger.error(f"Groq AI Init Error: {e}")
+
+# Initialize Gemini client (fallback OCR provider)
 try:
     genai.configure(api_key=settings.GEMINI_API_KEY)
     logger.info("Gemini client initialized successfully.")
@@ -150,73 +160,112 @@ CRITICAL RULES:
 - Each entry should have at minimum: item_name.
 """
 
-        models_to_try = [
-            "models/gemini-2.5-flash", 
-            "models/gemini-2.0-flash", 
-            "models/gemini-flash-latest", 
-            "models/gemini-2.5-flash-lite", 
-            "models/gemini-2.0-flash-lite"
-        ]
-        raw_text = None
+        # ===== HELPER: Parse raw AI text into structured JSON =====
+        def parse_ocr_response(raw_text):
+            raw_text = raw_text.strip()
+            if "```json" in raw_text:
+                raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw_text:
+                raw_text = raw_text.split("```")[1].split("```")[0].strip()
+            start_idx = raw_text.find('{')
+            end_idx = raw_text.rfind('}')
+            if start_idx != -1 and end_idx != -1:
+                raw_text = raw_text[start_idx:end_idx+1]
+            data = json.loads(raw_text)
+            if isinstance(data, list):
+                data = {
+                    "is_valid_bill": True,
+                    "party_name": "General",
+                    "bill_type": "UNKNOWN",
+                    "total_amount": 0.0,
+                    "entries": data
+                }
+            elif not isinstance(data, dict):
+                data = {}
+            return data
+
         extracted_data = None
         last_error = None
-        
-        for attempt, target_model in enumerate(models_to_try):
+        ocr_provider_used = None
+
+        # ===== PROVIDER 1: Groq (Llama 4 Scout Vision) - PRIMARY =====
+        if groq_client:
             try:
-                model = genai.GenerativeModel(model_name=target_model, system_instruction=system_instruction)
-                response = model.generate_content([
-                    {"mime_type": file.content_type, "data": image_bytes}
-                ])
-
+                b64_image = base64.b64encode(image_bytes).decode("utf-8")
+                mime = file.content_type or "image/jpeg"
                 
-                raw_text = response.text.strip()
-                
-                if "```json" in raw_text:
-                    raw_text = raw_text.split("```json")[1].split("```")[0].strip()
-                elif "```" in raw_text:
-                    raw_text = raw_text.split("```")[1].split("```")[0].strip()
-                    
-                start_idx = raw_text.find('{')
-                end_idx = raw_text.rfind('}')
-                if start_idx != -1 and end_idx != -1:
-                    raw_text = raw_text[start_idx:end_idx+1]
-                extracted_data = json.loads(raw_text)
-                if isinstance(extracted_data, list):
-                    extracted_data = {
-                        "is_valid_bill": True,
-                        "party_name": "General",
-                        "bill_type": "UNKNOWN",
-                        "total_amount": 0.0,
-                        "entries": extracted_data
-                    }
-                elif not isinstance(extracted_data, dict):
-                    extracted_data = {}
-                
-
-                last_error = None
-                break
-                
-            except json.JSONDecodeError as je:
-                last_error = ("json_parse", str(je))
+                groq_response = groq_client.chat.completions.create(
+                    model="meta-llama/llama-4-scout-17b-16e-instruct",
+                    messages=[
+                        {"role": "system", "content": system_instruction},
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:{mime};base64,{b64_image}"
+                                    }
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "Extract all items from this handwritten bill image. Return only valid JSON."
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens=4096
+                )
+                raw_text = groq_response.choices[0].message.content
+                extracted_data = parse_ocr_response(raw_text)
+                ocr_provider_used = "groq_llama4_scout"
+                logger.info("OCR successful via Groq Llama 4 Scout")
             except Exception as e:
-                error_str = str(e)
-                if "API_KEY_INVALID" in error_str or "invalid api key" in error_str.lower() or "401" in error_str or "403" in error_str or "UNAUTHENTICATED" in error_str:
-                    last_error = ("auth_error", error_str)
+                logger.warning(f"Groq OCR failed: {str(e)}")
+                last_error = ("groq_failed", str(e))
+
+        # ===== PROVIDER 2: Gemini (Fallback) =====
+        if extracted_data is None:
+            gemini_models = [
+                "models/gemini-2.5-flash",
+                "models/gemini-2.0-flash",
+                "models/gemini-flash-latest",
+                "models/gemini-2.5-flash-lite"
+            ]
+            for target_model in gemini_models:
+                try:
+                    model = genai.GenerativeModel(model_name=target_model, system_instruction=system_instruction)
+                    response = model.generate_content([
+                        {"mime_type": file.content_type, "data": image_bytes}
+                    ])
+                    raw_text = response.text.strip()
+                    extracted_data = parse_ocr_response(raw_text)
+                    ocr_provider_used = f"gemini_{target_model}"
+                    last_error = None
+                    logger.info(f"OCR successful via Gemini ({target_model})")
                     break
-                elif "429" in error_str or "quota" in error_str.lower() or "rate_limit" in error_str.lower() or "RESOURCE_EXHAUSTED" in error_str:
-                    last_error = ("rate_limit", error_str)
-                else:
-                    if not last_error or last_error[0] != "rate_limit":
-                        last_error = ("general", error_str)
-            
-        if last_error is not None:
+                except json.JSONDecodeError as je:
+                    last_error = ("json_parse", str(je))
+                except Exception as e:
+                    error_str = str(e)
+                    if "API_KEY_INVALID" in error_str or "invalid api key" in error_str.lower() or "401" in error_str or "403" in error_str or "UNAUTHENTICATED" in error_str:
+                        last_error = ("auth_error", error_str)
+                        break
+                    elif "429" in error_str or "quota" in error_str.lower() or "rate_limit" in error_str.lower() or "RESOURCE_EXHAUSTED" in error_str:
+                        last_error = ("rate_limit", error_str)
+                    else:
+                        if not last_error or last_error[0] != "rate_limit":
+                            last_error = ("general", error_str)
+
+        # ===== ERROR HANDLING =====
+        if extracted_data is None and last_error is not None:
             err_type, err_msg = last_error
             if err_type == "auth_error":
-                raise HTTPException(status_code=401, detail="GEMINI_API_KEY is invalid. Please update your API key in the backend .env file.")
+                raise HTTPException(status_code=401, detail="API key is invalid. Please update your API key.")
             elif err_type == "rate_limit":
-                raise HTTPException(status_code=429, detail="Gemini API rate limit exceeded. Please wait a minute and try again.")
+                raise HTTPException(status_code=429, detail="AI rate limit exceeded. Please wait a minute and try again.")
             else:
-                raise HTTPException(status_code=500, detail="Could not process the image via Gemini Vision. Please try again.")
+                raise HTTPException(status_code=500, detail="Could not process the image. Please try again.")
                 
         extracted_data['image_path'] = image_url_path
         
