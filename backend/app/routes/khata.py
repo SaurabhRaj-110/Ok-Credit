@@ -118,10 +118,18 @@ def delete_party(party_id: str, merchant_id: str, db: Session = Depends(get_db),
 def sync_all_data(merchant_id: str, db: Session = Depends(get_db), jwt_merchant_id: str = Depends(get_current_merchant_id)):
     if merchant_id != jwt_merchant_id: raise HTTPException(status_code=403, detail="Access Denied")
     try:
-        from app.models import Inventory, Bill
+        from app.models import Inventory, Bill, DailySale
+        from datetime import date, timedelta
         parties = db.query(Party).filter(Party.merchant_id == merchant_id).all()
         transactions = db.query(Transaction).filter(Transaction.merchant_id == merchant_id).order_by(Transaction.created_at.desc()).all()
         inventory = db.query(Inventory).filter(Inventory.merchant_id == merchant_id).all()
+        
+        # Fetch daily sales for the last 7 days to avoid huge payloads, ordered newest first
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        daily_sales = db.query(DailySale).filter(
+            DailySale.merchant_id == merchant_id,
+            DailySale.timestamp >= seven_days_ago
+        ).order_by(DailySale.timestamp.desc()).all()
         
         parties_data = []
         for p in parties:
@@ -151,17 +159,32 @@ def sync_all_data(merchant_id: str, db: Session = Depends(get_db), jwt_merchant_
                 "item_name": i.item_name,
                 "category": i.category,
                 "current_stock": i.current_stock,
+                "reorder_level": i.reorder_level,
                 "unit": i.unit,
                 "price": i.price,
                 "purchase_price": i.purchase_price
             } for i in inventory
         ]
         
+        sales_data = [
+            {
+                "sale_id": s.sale_id,
+                "type": s.type,
+                "item": s.item or "Item",
+                "qty": s.qty or 0,
+                "amount": s.amount,
+                "note": s.note or "",
+                "entry_source": s.entry_source or "Manual",
+                "timestamp": s.timestamp.isoformat() if s.timestamp else datetime.utcnow().isoformat()
+            } for s in daily_sales
+        ]
+        
         return {
             "status": "success",
             "parties": parties_data,
             "inventory": inv_data,
-            "daily_sales": [] # we need a DailySales model or merge it into transactions. I will leave it empty for now as requested by user to not break UI, we can just return empty array
+            "daily_sales": sales_data
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+

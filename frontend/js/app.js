@@ -838,16 +838,24 @@ window.fetch = async function() {
 
                         // Map Daily Sales
                         if (data.daily_sales) {
-                            localDailyLedger = data.daily_sales.map(s => ({
-                                id: s.sale_id,
-                                type: s.type,
-                                item: s.item,
-                                qty: s.qty,
-                                amount: s.amount,
-                                note: s.note,
-                                timestamp: new Date(s.timestamp + 'Z').getTime(), // Handle UTC
-                                date: new Date(s.timestamp + 'Z').toLocaleString()
-                            }));
+                            localDailyLedger = data.daily_sales.map(s => {
+                                // Server returns UTC ISO strings without 'Z'. Add it so JS Date() parses them as UTC.
+                                let rawTs = s.timestamp || '';
+                                let tsStr = rawTs.endsWith('Z') ? rawTs : (rawTs.includes('+') ? rawTs : rawTs + 'Z');
+                                let tsMs = new Date(tsStr).getTime();
+                                return {
+                                    id: s.sale_id,
+                                    type: s.type,
+                                    item: s.item,
+                                    qty: s.qty,
+                                    unit: s.unit || 'items',
+                                    amount: s.amount,
+                                    note: s.note,
+                                    entry_source: s.entry_source,
+                                    timestamp: tsMs,
+                                    date: new Date(tsStr).toLocaleString()
+                                };
+                            });
                         }
 
                         saveStateToStorage();
@@ -2206,11 +2214,22 @@ window.fetch = async function() {
 
                         let addedByStr = tx.note && tx.note.includes('Voice') ? '<i class="ti ti-microphone" style="color:var(--primary); font-size:14px;"></i> Voice Munim' : (tx.note && tx.note.includes('Snap') ? '<i class="ti ti-camera" style="font-size:14px;"></i> KhataSnap AI' : '<i class="ti ti-user" style="font-size:14px;"></i> Manual Entry');
 
-                        // Fake a realistic oldStock number for the visual impact based on the current transaction
-                        let calculatedOldStock = isSale ? (safeQty + 10) : (isPurchase ? 15 : 0);
-                        let calculatedNewStock = isSale ? 10 : (isPurchase ? (15 + safeQty) : 0);
+                        // Look up real stock impact from inventory
+                        let stockItem = localStock.find(s => s.name === tx.item || s.name === tx.itemName);
+                        let currentStock = stockItem ? stockItem.quantity : null;
+                        let impactStr;
+                        if (isSale || isPurchase) {
+                            if (currentStock !== null && safeQty > 0) {
+                                let beforeStock = isSale ? (currentStock + safeQty) : Math.max(0, currentStock - safeQty);
+                                let afterStock = isSale ? currentStock : (currentStock + safeQty);
+                                impactStr = `<i class="ti ti-box" style="color:#d97706; font-size:16px;"></i> <span style="color:var(--ink-muted); white-space:nowrap;">Stock Impact:</span> <span style="color:var(--primary); white-space:nowrap;">${beforeStock} &rarr; ${afterStock}</span> <span style="color:var(--ink-main); white-space:nowrap;">${stockItem ? stockItem.unit : 'Items'}</span>`;
+                            } else {
+                                impactStr = `<i class="ti ti-box" style="color:#d97706; font-size:16px;"></i> <span style="color:var(--ink-muted);">${isSale ? 'Stock Reduced' : 'Stock Added'}: ${safeQty} ${tx.unit || 'Items'}</span>`;
+                            }
+                        } else {
+                            impactStr = `<i class="ti ti-receipt" style="color:var(--purple); font-size:16px;"></i> <span style="color:var(--ink-muted);">Linked Sale:</span> Khata Updated`;
+                        }
 
-                        let impactStr = isSale || isPurchase ? `<i class="ti ti-box" style="color:#d97706; font-size:16px;"></i> <span style="color:var(--ink-muted); white-space:nowrap;">Stock Impact:</span> <span style="color:var(--primary); white-space:nowrap;">${calculatedOldStock} &rarr; ${calculatedNewStock}</span> <span style="color:var(--ink-main); white-space:nowrap;">${tx.unit||'Items'}</span>` : `<i class="ti ti-receipt" style="color:var(--purple); font-size:16px;"></i> <span style="color:var(--ink-muted);">Linked Sale:</span> Khata Updated`;
                         let evidenceUrl = tx.evidence ? (tx.evidence.startsWith('http') ? tx.evidence : (tx.evidence.startsWith('/uploads/') ? RENDER_API_URL + tx.evidence : RENDER_API_URL + '/uploads/' + tx.evidence.split('/').pop())) : null;
                         let evidenceHtml = evidenceUrl ? `<div style="margin-top: 10px; width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);"><a href="${evidenceUrl}" target="_blank" rel="noopener"><img src="${evidenceUrl}" style="width:100%; height:120px; object-fit:cover; display:block;" alt="Receipt Bill" onerror="this.parentElement.parentElement.style.display='none'"></a></div>` : '';
                         html += `

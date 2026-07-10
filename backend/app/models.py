@@ -78,9 +78,13 @@ class Bill(Base):
     
     bill_id = Column(String, primary_key=True, default=generate_uuid)
     merchant_id = Column(String, ForeignKey("merchants.merchant_id"), nullable=False, index=True)
+    party_id = Column(String, ForeignKey("parties.party_id"), nullable=True)
     bill_type = Column(String, nullable=False)
-    total_amount = Column(Float, nullable=False)
-    bill_date = Column(DateTime, default=datetime.utcnow)
+    total_amount = Column(Float, nullable=True, default=0.0)
+    bill_date = Column(String, nullable=True)  # stored as YYYY-MM-DD string
+    image_path = Column(String, nullable=True)
+    items_hash = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     merchant = relationship("Merchant", back_populates="bills")
 
