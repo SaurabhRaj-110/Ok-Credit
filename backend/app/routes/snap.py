@@ -206,7 +206,8 @@ CRITICAL RULES:
                 elif "429" in error_str or "quota" in error_str.lower() or "rate_limit" in error_str.lower() or "RESOURCE_EXHAUSTED" in error_str:
                     last_error = ("rate_limit", error_str)
                 else:
-                    last_error = ("general", error_str)
+                    if not last_error or last_error[0] != "rate_limit":
+                        last_error = ("general", error_str)
             
         if last_error is not None:
             err_type, err_msg = last_error
