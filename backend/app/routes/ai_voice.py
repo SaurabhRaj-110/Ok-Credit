@@ -61,15 +61,25 @@ async def process_voice_command(payload: VoiceRequest, db: Session = Depends(get
             elif action in ["ADD_STOCK", "REDUCE_STOCK"]:
                 item_name = ai_result.get("item_name")
                 try:
-                    qty = float(ai_result.get("quantity"))
+                    qty = float(ai_result.get("quantity") or 1)
                 except (ValueError, TypeError):
                     qty = 1.0
                 
+                amount = ai_result.get("amount")
+                rate = ai_result.get("rate")
+                
                 if not item_name:
                     continue
+                
+                verb = "becha" if action == "REDUCE_STOCK" else "stock mein aaya"
+                amount_str = ""
+                if amount:
+                    amount_str = f" — ₹{amount} ka"
+                elif rate:
+                    amount_str = f" — ₹{rate} rate par"
                     
-                change_str = f"+{qty}" if action == "ADD_STOCK" else f"-{qty}"
-                actions_processed.append(f"{item_name} ka stock update hoga: {change_str} units.")
+                change_str = f"-{qty}" if action == "REDUCE_STOCK" else f"+{qty}"
+                actions_processed.append(f"{item_name} {verb}: {change_str} units{amount_str}.")
                 
         if not actions_processed:
              return {"status": "TRY_AGAIN", "msg": "Saman ya naam samajh nahi aaya."}

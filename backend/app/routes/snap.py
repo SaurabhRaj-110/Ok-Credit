@@ -1,4 +1,5 @@
 import os
+import time
 import logging
 import json
 import uuid
@@ -151,7 +152,7 @@ CRITICAL RULES:
 - If NO valid items are found, YOU MUST RETURN "is_valid_bill": false and an empty "entries" array.
 """
 
-        models_to_try = ["models/gemini-2.5-flash", "models/gemini-2.5-flash-lite", "models/gemini-1.5-flash"]
+        models_to_try = ["models/gemini-2.5-flash", "models/gemini-2.5-flash-lite", "models/gemini-2.0-flash"]
         raw_text = None
         extracted_data = None
         last_error = None

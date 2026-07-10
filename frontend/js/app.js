@@ -1251,18 +1251,26 @@ window.fetch = async function() {
                 if (act.action === "ADD_STOCK" || act.action === "REDUCE_STOCK") {
                     let itemNameRaw = act.item_name || "";
                     let itemName = normalizeName(itemNameRaw);
-                    let itemObj = localStock.find(s => s.name.toLowerCase().includes(itemName) || itemName.includes(s.name.toLowerCase().split(' ')[0]));
+                    // More robust item matching: try contains, then starts-with first word
+                    let itemObj = localStock.find(s => s.name.toLowerCase() === itemName)
+                        || localStock.find(s => s.name.toLowerCase().includes(itemName) && itemName.length > 2)
+                        || localStock.find(s => itemName.includes(s.name.toLowerCase().split(' ')[0]) && s.name.split(' ')[0].length > 2);
+
+                    let qty = parseFloat(act.quantity) || 1;
+                    let rate = parseFloat(act.rate) || (itemObj ? parseFloat(itemObj.price) : 0);
+                    // Priority: explicit amount > qty*rate from AI > qty*local_price > 0
+                    let total = parseFloat(act.amount) || (rate > 0 ? qty * rate : (itemObj ? qty * parseFloat(itemObj.price || 0) : 0));
 
                     parsedActions.push({
                         actionType: 'STOCK',
                         type: act.action === "ADD_STOCK" ? 'PURCHASE' : 'SALE',
                         itemName: itemObj ? itemObj.name : itemNameRaw,
-                        qty: act.quantity || 1,
+                        qty: qty,
                         unit: act.unit || (itemObj ? itemObj.unit : 'items'),
-                        total: act.amount || (itemObj ? itemObj.price * (act.quantity || 1) : 0),
+                        total: total,
                         itemObj: itemObj
                     });
-                } else if (act.action.includes("CREDIT") || act.action.includes("PAYMENT") || act.action.includes("REPAYMENT")) {
+                } else if (act.action && (act.action.includes("CREDIT") || act.action.includes("PAYMENT") || act.action.includes("REPAYMENT"))) {
                     let isJama = act.action === "CUSTOMER_PAYMENT" || act.action === "CUSTOMER_REPAYMENT" || act.action === "SUPPLIER_PAYMENT";
                     let isCustomer = act.action.includes("CUSTOMER");
 

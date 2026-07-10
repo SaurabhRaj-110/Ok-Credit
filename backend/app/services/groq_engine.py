@@ -29,6 +29,11 @@ class GroqEngine:
         3. "SUPPLIER_PAYMENT": Shopkeeper paid money to supplier/distributor (e.g., supplier ko paise de diye, payment kar diya). Subtracts from supplier balance.
         4. "SUPPLIER_CREDIT": Shopkeeper took maal on credit from supplier, OR owes money to supplier (e.g., supplier ka baki likh do, supplier ko dene hain). Adds to supplier balance.
         5. "ADD_STOCK" / "REDUCE_STOCK": For inventory changes. DO NOT confuse people's names with stock items.
+           - "REDUCE_STOCK" = items SOLD (becha, sold, sale, bika, gaya, de diya).
+           - "ADD_STOCK" = stock received (aaya, add kiya, khareeda, purchase).
+           - ALWAYS extract: item_name, quantity, unit, AND the selling/buying price as "rate" (price per unit), AND total "amount" if mentioned.
+           - Example: "5 packet Maggi becha 150 rupaye mein" -> item_name: "Maggi", quantity: 5, unit: "packet", rate: 30, amount: 150, action: "REDUCE_STOCK"
+           - Example: "aaj 10 kilo atta becha 40 rupaye kilo" -> item_name: "Atta", quantity: 10, unit: "kg", rate: 40, amount: 400, action: "REDUCE_STOCK"
         6. "NAVIGATE_STOCK" / "NAVIGATE_KHATA" / "NAVIGATE_SNAP": Use these if the user wants to navigate to a section.
         7. For names of items or people, ALWAYS transliterate Hindi/regional words into English script (e.g., "सौरभ राज" -> "Saurabh Raj"). Do NOT return text in Devanagari.
         8. If command contains "supplier", "distributor", "wholesaler", "vendor", "company" -> ALWAYS classify as SUPPLIER_PAYMENT or SUPPLIER_CREDIT, and return "party_type": "SUPPLIER".
@@ -48,9 +53,10 @@ class GroqEngine:
                 "item_name": string or null,
                 "quantity": float or null,
                 "unit": string or null,
+                "rate": float or null (price per unit for stock actions),
+                "amount": float or null (total amount),
                 "target_name": string or null (Name of customer or supplier),
-                "party_type": "CUSTOMER" | "SUPPLIER" | null,
-                "amount": float or null
+                "party_type": "CUSTOMER" | "SUPPLIER" | null
             }}
           ]
         }}
