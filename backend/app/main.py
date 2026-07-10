@@ -57,3 +57,13 @@ def on_startup():
 @app.get("/")
 def read_root():
     return {"status": "ONLINE", "message": "ShopSathi Core API Gateway is live."}
+
+@app.get("/api/migrate-db")
+def migrate_db():
+    try:
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE bills ADD COLUMN party_id VARCHAR;"))
+        return {"status": "SUCCESS", "message": "Migration applied"}
+    except Exception as e:
+        return {"status": "ERROR", "message": str(e)}
