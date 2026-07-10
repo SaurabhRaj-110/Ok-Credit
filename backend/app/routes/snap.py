@@ -150,7 +150,7 @@ CRITICAL RULES:
 - Each entry should have at minimum: item_name.
 """
 
-        models_to_try = ["models/gemini-2.5-flash", "models/gemini-2.5-flash-lite", "models/gemini-2.0-flash"]
+        models_to_try = ["models/gemini-2.5-flash", "models/gemini-1.5-flash", "models/gemini-2.5-flash-lite", "models/gemini-2.0-flash"]
         raw_text = None
         extracted_data = None
         last_error = None
