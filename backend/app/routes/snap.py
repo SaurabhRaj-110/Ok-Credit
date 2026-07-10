@@ -274,7 +274,7 @@ CRITICAL RULES:
             elif err_type == "rate_limit":
                 raise HTTPException(status_code=429, detail="AI rate limit exceeded. Please wait a minute and try again.")
             else:
-                raise HTTPException(status_code=500, detail="Could not process the image. Please try again.")
+                raise HTTPException(status_code=500, detail=f"Could not process the image. Error: {err_msg}")
         
         if extracted_data is None:
             raise HTTPException(status_code=500, detail="No OCR provider available. Please try again later.")
