@@ -152,7 +152,7 @@ CRITICAL RULES:
 - If NO valid items are found, YOU MUST RETURN "is_valid_bill": false and an empty "entries" array.
 """
 
-        models_to_try = ["models/gemini-2.5-flash", "models/gemini-2.5-flash-lite", "models/gemini-2.0-flash"]
+        models_to_try = ["models/gemini-2.5-flash", "models/gemini-2.5-flash-lite", "models/gemini-1.5-flash"]
         raw_text = None
         extracted_data = None
         last_error = None
@@ -172,25 +172,10 @@ CRITICAL RULES:
                 elif "```" in raw_text:
                     raw_text = raw_text.split("```")[1].split("```")[0].strip()
                     
-                start_dict = raw_text.find('{')
-                start_list = raw_text.find('[')
-                
-                if start_dict == -1 and start_list == -1:
-                    start_idx = -1
-                elif start_dict == -1:
-                    start_idx = start_list
-                elif start_list == -1:
-                    start_idx = start_dict
-                else:
-                    start_idx = min(start_dict, start_list)
-                    
-                end_dict = raw_text.rfind('}')
-                end_list = raw_text.rfind(']')
-                end_idx = max(end_dict, end_list)
-                
+                start_idx = raw_text.find('{')
+                end_idx = raw_text.rfind('}')
                 if start_idx != -1 and end_idx != -1:
                     raw_text = raw_text[start_idx:end_idx+1]
-                    
                 extracted_data = json.loads(raw_text)
                 if isinstance(extracted_data, list):
                     extracted_data = {
@@ -203,6 +188,7 @@ CRITICAL RULES:
                 elif not isinstance(extracted_data, dict):
                     extracted_data = {}
                 
+
                 last_error = None
                 break
                 
