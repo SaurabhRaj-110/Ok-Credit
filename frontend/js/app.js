@@ -36,6 +36,7 @@ window.fetch = async function() {
         
         function validatePhone() {
             let input = document.getElementById('loginPhoneInput');
+            if (!input) return;
             let val = input.value.replace(/\D/g, '');
             if (val.startsWith('91') && val.length > 10) {
                 val = val.substring(2);
@@ -50,20 +51,34 @@ window.fetch = async function() {
             let btn = document.getElementById('sendOtpBtn');
             let icon = document.getElementById('phoneCheckIcon');
             
-            if (val.length === 10) {
-                btn.disabled = false;
-                btn.style.background = '#0c8854';
-                btn.style.cursor = 'pointer';
-                icon.className = 'ti ti-circle-check-filled';
-                icon.style.color = '#10b981';
-            } else {
-                btn.disabled = true;
-                btn.style.background = '#cbd5e1';
-                btn.style.cursor = 'not-allowed';
-                icon.className = 'ti ti-circle-check';
-                icon.style.color = '#cbd5e1';
+            if (btn && icon) {
+                if (val.length === 10) {
+                    btn.disabled = false;
+                    btn.removeAttribute('disabled');
+                    btn.style.background = '#0c8854';
+                    btn.style.cursor = 'pointer';
+                    icon.className = 'ti ti-circle-check-filled';
+                    icon.style.color = '#10b981';
+                } else {
+                    btn.disabled = true;
+                    btn.setAttribute('disabled', 'true');
+                    btn.style.background = '#cbd5e1';
+                    btn.style.cursor = 'not-allowed';
+                    icon.className = 'ti ti-circle-check';
+                    icon.style.color = '#cbd5e1';
+                }
             }
         }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginInput = document.getElementById('loginPhoneInput');
+            if (loginInput) {
+                loginInput.addEventListener('input', validatePhone);
+                loginInput.addEventListener('change', validatePhone);
+                // Also trigger validation once on load just in case it's pre-filled
+                validatePhone();
+            }
+        });
         
         async function requestOTP() {
             let phone = document.getElementById('loginPhoneInput').value.trim();
