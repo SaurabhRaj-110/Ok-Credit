@@ -63,19 +63,24 @@ def migrate_db():
     errors = []
     try:
         from sqlalchemy import text
-        with engine.begin() as conn:
-            try:
+        
+        try:
+            with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE bills ADD COLUMN party_id VARCHAR;"))
-            except Exception as e:
-                errors.append(f"party_id error: {str(e)}")
-            try:
+        except Exception as e:
+            errors.append(f"party_id error: {str(e)}")
+            
+        try:
+            with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE bills ADD COLUMN image_path VARCHAR;"))
-            except Exception as e:
-                errors.append(f"image_path error: {str(e)}")
-            try:
+        except Exception as e:
+            errors.append(f"image_path error: {str(e)}")
+            
+        try:
+            with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE bills ADD COLUMN items_hash VARCHAR;"))
-            except Exception as e:
-                errors.append(f"items_hash error: {str(e)}")
+        except Exception as e:
+            errors.append(f"items_hash error: {str(e)}")
         
         return {"status": "SUCCESS", "message": "Migration finished", "errors": errors}
     except Exception as e:
