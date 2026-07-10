@@ -2913,6 +2913,13 @@ window.fetch = async function() {
                     } catch (err) {
                         console.warn(`OCR attempt ${attempt + 1} failed:`, err);
                         finalError = err;
+                        let errMsg = err.message || '';
+                        
+                        // Don't retry on rate limit or auth errors
+                        if (errMsg.includes('401') || errMsg.includes('API_KEY_INVALID') || errMsg.includes('invalid api key') ||
+                            errMsg.includes("rate limit") || errMsg.includes("quota") || errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED")) {
+                            break;
+                        }
 
                         if (attempt < maxRetries - 1) {
                             document.getElementById('bsAnalyzingFooterTitle').innerText = "AI is busy, retrying...";
@@ -2987,11 +2994,21 @@ window.fetch = async function() {
             let isSale = bsContext === 'SALE';
             let orb = document.getElementById('bsAnalyzingOrb');
             orb.className = 'bs-analyzing-orb' + (isSale ? '' : ' purchase');
+            orb.innerHTML = `<i class="ti ti-scan"></i>`; // Reset orb icon
+            orb.style.animation = ''; // Reset animation
+            orb.style.background = ''; // Reset background
+            
             document.getElementById('bsAnalyzingTitle').innerText = isSale ? "Analyzing Bill..." : "Analyzing Purchase Bill...";
+            
             let footer = document.getElementById('bsAnalyzingFooter');
             footer.className = 'bs-analyzing-footer' + (isSale ? '' : ' purchase');
             document.getElementById('bsAnalyzingFooterTitle').innerText = "Reading your bill...";
+            document.getElementById('bsAnalyzingFooterTitle').style.color = ""; // Reset color
             document.getElementById('bsAnalyzingFooterSub').innerText = "This takes just a moment";
+            
+            let existingBtns = document.getElementById('bsErrorBtns');
+            if (existingBtns) existingBtns.remove();
+            
             document.querySelectorAll('#bsCheckList .bs-check-row').forEach(r => r.classList.remove('done'));
             document.querySelectorAll('#bsCheckList .bs-check-row').forEach(r => r.classList.add('pending'));
             document.getElementById('billAnalyzingOverlay').style.display = 'flex';
