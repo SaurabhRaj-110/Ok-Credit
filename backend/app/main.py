@@ -63,7 +63,7 @@ def migrate_db():
     try:
         from sqlalchemy import text
         with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE bills ADD COLUMN party_id VARCHAR;"))
+            conn.execute(text("ALTER TABLE bills ADD COLUMN IF NOT EXISTS image_path VARCHAR;"))
         return {"status": "SUCCESS", "message": "Migration applied"}
     except Exception as e:
         return {"status": "ERROR", "message": str(e)}
